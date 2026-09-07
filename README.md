@@ -1,43 +1,75 @@
 # Urban Data Integration Platform
 
-A Spark + Delta Lake platform that ingests NYC taxi trips, weather, air quality and taxi zone data,
-standardises them, and integrates them into a single analytical table.
+A Spark + Delta Lake platform that ingests NYC taxi trips, weather, air quality and taxi zone data
+and standardises them into Delta tables that share one set of join keys.
+
+**Status.** The ingestion framework (Task 3) runs end to end and produces the four `silver/` tables.
+The integration pipeline that joins them into `gold/integrated_taxi_trips` (Task 5) and the storage
+benchmark (Task 6) are not implemented yet.
 
 Documentation: [Design Report](docs/design_report.md) ·
 [Data Catalog](docs/data_catalog.md) (Task 1) ·
 [Storage Architecture](docs/storage_architecture.md) (Task 2) ·
 [Common Data Model](docs/common_data_model.md) (Task 4)
 
+## Running the platform
+
+```bash
+python jobs/run_ingest.py                      # ingest all four datasets
+python jobs/run_ingest.py weather taxi_zones   # or just these
+```
+
+This is the ingestion pipeline. The integration pipeline that builds the joined `gold/` table is a
+separate job and does not exist yet.
+
+This reads `data/raw/`, writes Delta tables to `data/lakehouse/silver/`, and appends one row per
+dataset to `_meta/ingestion_metadata`. Rejected rows go to `_meta/quarantine` with the rule that
+rejected them. A full run takes about four minutes and prints:
+
+```
+dataset              status           read     written  rejected     sec
+taxi_trips           success     9,554,778   9,551,907     2,871  183.47
+weather              success         8,784       8,784         0    6.75
+air_quality          success        51,885       8,784         0   36.97
+taxi_zones           success           265         265         0    5.62
+```
+
+Re-running is safe. The silver tables are overwritten and the surrogate keys are content hashes, so
+the same input always produces the same result.
+
+On Windows, Spark prints `ERROR ShutdownHookManager: Exception while deleting Spark temp dir` when
+it exits. The run has already finished at that point, so ignore it.
+
+Reading a table afterwards:
+
+```python
+spark.read.format("delta").load("data/lakehouse/silver/taxi_trips")
+```
+
+## Adding a dataset
+
+Write `conf/datasets/<name>.yaml` declaring the source, expected schema, renames, timestamps, casts
+and quality rules. Most datasets need no Python. If one needs a derived column that cannot be
+declared, add a function to `src/urbanplatform/transforms/` and register it with `@pre_quality` or
+`@post_quality`.
+
 ## Setup
 
-Verified on Windows 11 with Anaconda Python 3.11. Spark 3.5.3, Delta Lake 3.2.1, JDK 17.
+Tested on Windows 11 with Anaconda Python 3.11, JDK 17, Spark 3.5.3 and Delta Lake 3.2.1.
 
-**1. Java 17.** Spark 3.5 needs Java 11 or 17. Installing through conda keeps it self-contained and
-needs no admin rights:
-
-```
-conda install -c conda-forge openjdk=17
-```
-
-Then set `JAVA_HOME` to the JDK root — for Anaconda that is `<anaconda>\Library\lib\jvm`.
-
-**2. Python packages.**
-
-```
+```bash
+conda install -c conda-forge openjdk=17     # Spark 3.5 needs Java 11 or 17
 pip install -r requirements.txt
 ```
 
-**3. Windows only: Hadoop native helpers.** Hadoop's `Shell` class needs `winutils.exe` and
-`hadoop.dll` on Windows, and PySpark does not ship them. Without these, Spark fails at startup with
-`HADOOP_HOME and hadoop.home.dir are unset`.
+Set `JAVA_HOME` to the JDK root. For Anaconda that is `<anaconda>\Library\lib\jvm`.
 
-Download both files for Hadoop 3.3.x — Spark 3.5.3 bundles Hadoop 3.3.4 — from
-[cdarlint/winutils](https://github.com/cdarlint/winutils/tree/master/hadoop-3.3.6/bin), put them in
-`<dir>\bin`, and set `HADOOP_HOME=<dir>` and add `%HADOOP_HOME%\bin` to `PATH`.
+**On Windows**, also download `winutils.exe` and `hadoop.dll` for Hadoop 3.3.x from
+[cdarlint/winutils](https://github.com/cdarlint/winutils/tree/master/hadoop-3.3.6/bin) into
+`<dir>\bin`, then set `HADOOP_HOME=<dir>` and add `%HADOOP_HOME%\bin` to `PATH`. PySpark does not
+ship these and Spark will not start without them. Linux and macOS do not need this step.
 
-On Linux and macOS this step is not needed.
-
-**4. Data.** Download the four datasets into `data/raw/`:
+Then download the datasets into `data/raw/`:
 
 ```
 data/raw/taxi_trips/yellow_tripdata_2024-{01,02,03}.parquet
@@ -46,26 +78,19 @@ data/raw/air_quality/hourly_88101_2024.csv
 data/raw/taxi_zones/taxi_zone_lookup.csv
 ```
 
-**5. Verify.**
+Finally, check everything works:
 
-```
+```bash
 python scripts/check_env.py
 ```
 
-It checks Java, the Hadoop helpers, the Python packages, the raw files, and a real Delta write and
-read. It prints a fix for the first thing that fails.
-
-## Notes
-
-- The first Spark start downloads the Delta jars from Maven into `~/.ivy2`. This is cached, so only
-  the first run is slow. Sessions set a Maven mirror to speed this up on slow connections.
-- On shutdown, Spark on Windows logs `ERROR ShutdownHookManager: Exception while deleting Spark temp
-  dir`. This is a known Windows file-locking issue, happens after all work has completed, and can be
-  ignored.
+It verifies Java, the Hadoop helpers, the Python packages, the raw files and a real Delta write, and
+prints a fix for the first thing that fails.
 
 ## Scripts
 
 | Script | What it does | Needs Spark |
 |---|---|---|
+| `jobs/run_ingest.py` | runs the ingestion framework | yes |
 | `scripts/check_env.py` | verifies the whole stack end to end | yes |
-| `scripts/profile_raw.py` | profiles the raw files; produces every number quoted in the data catalog | no |
+| `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
