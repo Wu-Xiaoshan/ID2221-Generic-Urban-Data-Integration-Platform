@@ -1,0 +1,9 @@
+# Ignore local documents
+*.pdf
+
+# Ignore large raw datasets kept only on local machines
+/data/raw/
+
+# Optional common local artifacts
+__pycache__/
+*.pyc
