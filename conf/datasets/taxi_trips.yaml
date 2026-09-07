@@ -1,0 +1,134 @@
+name: taxi_trips
+description: NYC yellow taxi trip records, the platform's fact table.
+
+source:
+  format: parquet
+  path: data/raw/taxi_trips/*.parquet
+
+# Checked on every run. Missing columns are reported, not fatal, unless listed under
+# required_columns. New columns are expected: the feed gained a fee column in each of
+# 2015, 2019, 2022 and 2025.
+expected_columns:
+  VendorID: int
+  tpep_pickup_datetime: timestamp_ntz
+  tpep_dropoff_datetime: timestamp_ntz
+  passenger_count: bigint
+  trip_distance: double
+  RatecodeID: bigint
+  store_and_fwd_flag: string
+  PULocationID: int
+  DOLocationID: int
+  payment_type: bigint
+  fare_amount: double
+  extra: double
+  mta_tax: double
+  tip_amount: double
+  tolls_amount: double
+  improvement_surcharge: double
+  total_amount: double
+  congestion_surcharge: double
+  Airport_fee: double
+
+required_columns:
+  - tpep_pickup_datetime
+  - tpep_dropoff_datetime
+  - PULocationID
+  - DOLocationID
+  - total_amount
+
+# Only columns needing a semantic rename are listed. Everything else, Airport_fee and
+# PULocationID included, is handled by the mechanical snake_case rule.
+rename:
+  trip_distance: trip_distance_mi
+
+# Wall-clock New York time with no offset, so it has to be converted. March 2024 crosses
+# the DST boundary, which America/New_York handles and a fixed -5 offset would not.
+timestamps:
+  pickup_ts:
+    from: tpep_pickup_datetime
+    tz: America/New_York
+  dropoff_ts:
+    from: tpep_dropoff_datetime
+    tz: America/New_York
+
+cast:
+  passenger_count: int
+  ratecode_id: int
+  payment_type: int
+
+drop:
+  - tpep_pickup_datetime
+  - tpep_dropoff_datetime
+
+quality:
+  primary_key: [trip_id]
+  rules:
+    - type: not_null
+      columns: [trip_id, pickup_ts, dropoff_ts, pu_location_id, do_location_id]
+
+    - type: unique
+      columns: [trip_id]
+      name: duplicate_trip
+
+    # Catches corrupt timestamps: the files are labelled January-March 2024 but contain
+    # a handful of rows dated 2002, 2008 and 2009. Left in, they would create extra
+    # partitions holding about four records each, so they are rejected before
+    # pickup_year_month reaches the writer.
+    #
+    # The bounds are UTC instants, because pickup_ts has already been converted from
+    # New York local time. They are the exact UTC equivalents of the labelled local
+    # coverage: 2024-01-01T00:00 EST is 05:00Z, and 2024-04-01T00:00 EDT is 04:00Z.
+    #
+    # Both halves of that were learned by getting it wrong. Writing the bounds as bare
+    # local dates rejected every trip after 20:00 on 31 March -- 16,721 legitimate
+    # rush-hour trips -- because local 20:00 is already 00:00Z the next day. Padding
+    # them by a day instead let a single 00:34 trip on 1 April through, which created a
+    # fourth partition holding one row: exactly the failure this rule exists to prevent.
+    - type: timestamp_window
+      column: pickup_ts
+      min: "2024-01-01 05:00:00"
+      max: "2024-04-01 04:00:00"
+      name: pickup_outside_window
+
+    - type: range
+      column: trip_duration_min
+      min: 0
+      exclusive_min: true
+      max: 1440
+      name: implausible_duration
+
+    - type: range
+      column: trip_distance_mi
+      min: 0
+      name: negative_distance
+
+    # Flagged, not rejected. 2.26% of trips report zero distance and 1.2% a negative
+    # total: implausible, but they are real records of real transactions (refunds and
+    # disputes), so discarding them would silently change the trip count.
+    - type: range
+      column: trip_distance_mi
+      min: 0
+      exclusive_min: true
+      on_fail: flag
+      name: zero_distance
+
+    - type: range
+      column: total_amount
+      min: 0
+      on_fail: flag
+      name: negative_total
+
+    - type: allowed_values
+      column: vendor_id
+      values: [1, 2, 6, 7]
+      on_fail: flag
+      name: unknown_vendor
+
+target:
+  table: taxi_trips
+  layer: silver
+  mode: overwrite
+  # Three ~50 MB partitions. Daily would give 91 partitions of 1.8 MB each; see
+  # docs/storage_architecture.md section 5.
+  partition_by: [pickup_year_month]
+  zorder_by: [pu_location_id]

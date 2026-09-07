@@ -1,0 +1,115 @@
+name: air_quality
+description: EPA AQS hourly PM2.5 measurements, filtered to New York City.
+
+source:
+  format: csv
+  path: data/raw/air_quality/*.csv
+  options:
+    header: true
+    inferSchema: false      # site identifiers are zero-padded; see cast below
+  # The file is the EPA's national extract: 8,139,551 rows, of which 51,885 are in New
+  # York City. Applied at read time so the predicate reaches the scan rather than
+  # carrying 2.2 GB through the pipeline to keep 12 MB.
+  filter: "`State Code` = '36' AND `County Code` IN ('005','047','061','081','085')"
+
+expected_columns:
+  State Code: string
+  County Code: string
+  Site Num: string
+  Parameter Code: string
+  POC: string
+  Latitude: string
+  Longitude: string
+  Datum: string
+  Parameter Name: string
+  Date Local: string
+  Time Local: string
+  Date GMT: string
+  Time GMT: string
+  Sample Measurement: string
+  Units of Measure: string
+  MDL: string
+  Uncertainty: string
+  Qualifier: string
+  Method Type: string
+  Method Code: string
+  Method Name: string
+  State Name: string
+  County Name: string
+  Date of Last Change: string
+
+required_columns:
+  - State Code
+  - County Code
+  - Site Num
+  - POC
+  - Date GMT
+  - Time GMT
+  - Sample Measurement
+
+rename:
+  Sample Measurement: pm25_ugm3_raw
+
+# The GMT pair, not the local pair. EPA "Local" is Eastern Standard Time all year, so
+# from 10 March 2024 it differs by an hour from New York's actual local time — while
+# both columns are called "local".
+timestamps:
+  obs_ts:
+    from_concat: [date_gmt, time_gmt]
+    format: "yyyy-MM-dd HH:mm"
+    tz: UTC
+
+cast:
+  pm25_ugm3_raw: double
+  latitude: double
+  longitude: double
+  poc: int
+
+drop:
+  - date_local
+  - time_local
+  - date_gmt
+  - time_gmt
+  - date_of_last_change
+  - uncertainty
+  - datum
+
+quality:
+  # POC distinguishes co-located instruments at one site. Measured on this extract:
+  # 4,587 duplicates without it in the key, 0 with it. De-duplicating on the shorter
+  # key would delete 4,587 real readings.
+  primary_key: [site_id, parameter_code, poc, obs_ts]
+  rules:
+    - type: not_null
+      columns: [site_id, poc, obs_ts, pm25_ugm3_raw]
+
+    - type: unique
+      columns: [site_id, parameter_code, poc, obs_ts]
+      name: duplicate_reading
+
+    - type: timestamp_window
+      column: obs_ts
+      min: "2024-01-01"
+      max: "2025-01-02"
+      name: obs_outside_window
+
+    # PM2.5 cannot be negative. The upper bound is far above New York's worst recorded
+    # hour (98 in this extract, from Canadian wildfire smoke) but below sensor-fault
+    # territory.
+    - type: range
+      column: pm25_ugm3_raw
+      min: 0
+      max: 1000
+      name: implausible_pm25
+
+    - type: allowed_values
+      column: units_of_measure
+      values: ["Micrograms/cubic meter (LC)"]
+      name: unexpected_unit
+
+target:
+  table: air_quality_hourly
+  layer: silver
+  mode: overwrite
+  # 8,784 rows after the city-wide hourly aggregation.
+  partition_by: []

@@ -1,0 +1,60 @@
+name: taxi_zones
+description: TLC taxi zone lookup. The platform's only conformed dimension.
+
+source:
+  format: csv
+  path: data/raw/taxi_zones/*.csv
+  options:
+    header: true
+    inferSchema: true
+    # "N/A" is a literal value in this file, not a missing one: zone 264 is
+    # Unknown/N/A and zone 265 is N/A/Outside of NYC. Declared explicitly rather than
+    # inherited, because a library's idea of "missing" is not the data's.
+    nullValue: ""
+
+expected_columns:
+  LocationID: int
+  Borough: string
+  Zone: string
+  service_zone: string
+
+required_columns: [LocationID, Borough, Zone]
+
+rename: {}
+
+# The only dataset with no temporal dimension, which is why it is the lookup table.
+timestamps: {}
+
+cast:
+  location_id: int
+
+drop: []
+
+quality:
+  primary_key: [location_id]
+  rules:
+    - type: not_null
+      columns: [location_id, borough, zone]
+
+    - type: unique
+      columns: [location_id]
+      name: duplicate_zone
+
+    - type: range
+      column: location_id
+      min: 1
+      max: 265
+      name: location_id_out_of_range
+
+    - type: allowed_values
+      column: borough
+      values: [Manhattan, Brooklyn, Queens, Bronx, Staten Island, EWR, Unknown, "N/A"]
+      name: unknown_borough
+
+target:
+  table: taxi_zones
+  layer: silver
+  # Overwrite each run: the zones have been stable since 2015 and there is no history
+  # requirement, so this is an SCD Type 1 dimension.
+  mode: overwrite
+  partition_by: []

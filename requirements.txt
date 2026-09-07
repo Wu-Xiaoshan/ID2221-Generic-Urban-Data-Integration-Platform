@@ -1,0 +1,16 @@
+# Python packages. Install with:
+#   pip install -r requirements.txt
+#
+# Also required, and NOT installable via pip:
+#   1. JDK 17          conda install -c conda-forge openjdk=17
+#   2. winutils.exe + hadoop.dll   (Windows only, see README)
+#
+# Run scripts/check_env.py to verify the whole stack.
+
+pyspark==3.5.3
+delta-spark==3.2.1
+pyyaml>=6.0
+
+# used by scripts/profile_raw.py only (no Spark needed)
+pandas>=2.0
+pyarrow>=11.0

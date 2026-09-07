@@ -1,0 +1,50 @@
+# Platform-wide settings. Paths are relative to the repository root unless absolute.
+
+lakehouse_root: data/lakehouse
+raw_root: data/raw
+
+layers:
+  silver: silver
+  gold: gold
+  benchmark: benchmark
+  meta: _meta
+
+spark:
+  app_name: urban-data-platform
+  # Deliberately not local[*]. On a 16-core machine that starts 16 tasks that each
+  # build a cache block in the driver heap at once, which exhausts it well before the
+  # data is large enough to justify that parallelism.
+  master: "local[4]"
+  config:
+    # Local mode runs the executor inside the driver JVM, and the default 1 GB heap is
+    # not enough to cache 9.5M trip rows. PySpark passes this to spark-submit, so it
+    # does take effect despite the JVM being launched by the builder.
+    spark.driver.memory: 4g
+    spark.driver.maxResultSize: 1g
+
+    # Everything in the platform is UTC. Set here so no downstream code has to
+    # reason about the driver's local timezone.
+    spark.sql.session.timeZone: UTC
+
+    spark.sql.extensions: io.delta.sql.DeltaSparkSessionExtension
+    spark.sql.catalog.spark_catalog: org.apache.spark.sql.delta.catalog.DeltaCatalog
+
+    # Delta file layout. targetFileSize is deliberately larger than any partition
+    # this dataset produces; see docs/storage_architecture.md section 5.
+    spark.databricks.delta.optimizeWrite.enabled: "true"
+    spark.databricks.delta.autoCompact.enabled: "true"
+    spark.databricks.delta.targetFileSize: 134217728
+
+    spark.sql.shuffle.partitions: "8"
+    spark.sql.adaptive.enabled: "true"
+    spark.sql.parquet.compression.codec: snappy
+
+    # Broadcast anything up to 32 MB. Every dimension in this platform is far
+    # below that, so the integration pipeline shuffles nothing.
+    spark.sql.autoBroadcastJoinThreshold: 33554432
+
+    # First run resolves the Delta jars from Maven; this mirror is much faster
+    # on slow connections. Harmless once ~/.ivy2 is populated.
+    spark.jars.repositories: https://maven.aliyun.com/repository/public
+
+    spark.ui.showConsoleProgress: "false"

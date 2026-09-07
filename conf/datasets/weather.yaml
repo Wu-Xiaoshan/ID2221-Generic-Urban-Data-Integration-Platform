@@ -1,0 +1,120 @@
+name: weather
+description: Hourly weather observations for New York, one implicit station.
+
+source:
+  format: csv
+  path: data/raw/weather/*.csv
+  options:
+    header: true
+    inferSchema: true
+
+expected_columns:
+  year: int
+  month: int
+  day: int
+  hour: int
+  temp: double
+  rhum: int
+  prcp: double
+  snwd: string
+  wdir: int
+  wspd: double
+  wpgt: string
+  pres: double
+  cldc: int
+  coco: int
+  temp_source: string
+  rhum_source: string
+  prcp_source: string
+  snwd_source: string
+  wdir_source: string
+  wspd_source: string
+  wpgt_source: string
+  pres_source: string
+  cldc_source: string
+  coco_source: string
+
+required_columns: [year, month, day, hour, temp]
+
+# Meteostat's short names carry no unit, and the units are not all metric-obvious
+# (wind is km/h, pressure hPa). The naming convention requires the unit in the name.
+rename:
+  temp: temp_c
+  rhum: humidity_pct
+  prcp: precipitation_mm
+  wdir: wind_direction_deg
+  wspd: wind_speed_kmh
+  pres: pressure_hpa
+  cldc: cloud_cover_oktas
+  coco: condition_code
+
+# The timestamp does not exist as a column: it is four integers. Already UTC, so it is
+# assembled but not converted.
+timestamps:
+  obs_ts:
+    from_parts: {year: year, month: month, day: day, hour: hour}
+    tz: UTC
+
+cast:
+  condition_code: int
+  cloud_cover_oktas: int
+
+# snwd and wpgt are 100% null across all 8,784 rows, along with their source columns.
+# The four time-part columns are superseded by obs_ts.
+drop:
+  - snwd
+  - snwd_source
+  - wpgt
+  - wpgt_source
+  - year
+  - month
+  - day
+  - hour
+
+quality:
+  primary_key: [obs_hour]
+  rules:
+    - type: not_null
+      columns: [obs_ts, temp_c]
+
+    - type: unique
+      columns: [obs_hour]
+      name: duplicate_hour
+
+    - type: timestamp_window
+      column: obs_ts
+      min: "2024-01-01"
+      max: "2025-01-01"
+      name: obs_outside_window
+
+    # Physical plausibility. New York has never come close to either bound.
+    - type: range
+      column: temp_c
+      min: -40
+      max: 55
+      name: implausible_temperature
+
+    - type: range
+      column: humidity_pct
+      min: 0
+      max: 100
+      name: humidity_out_of_range
+
+    - type: range
+      column: wind_direction_deg
+      min: 0
+      max: 360
+      name: wind_direction_out_of_range
+
+    - type: range
+      column: precipitation_mm
+      min: 0
+      name: negative_precipitation
+
+target:
+  table: weather_hourly
+  layer: silver
+  mode: overwrite
+  # 8,784 rows in well under a megabyte. Any partitioning here would produce
+  # directories smaller than their own metadata.
+  partition_by: []

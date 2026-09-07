@@ -1,9 +1,26 @@
-# Ignore local documents
+# Local documents
 *.pdf
 
-# Ignore large raw datasets kept only on local machines
-/data/raw/
+# Source datasets: downloaded, not authored here (~2.4 GB).
+# Keep the empty folders so a fresh clone knows where the files go. Un-ignoring a
+# directory re-includes its contents, so the contents are ignored again on the
+# third line before .gitkeep is allowed back on the fourth.
+/data/raw/*
+!/data/raw/*/
+/data/raw/*/*
+!/data/raw/*/.gitkeep
 
-# Optional common local artifacts
+# Derived output: rebuilt by `python jobs/run_ingest.py` (~727 MB).
+# Delta transaction logs also record absolute paths, so a committed copy would
+# not work on another machine.
+/data/lakehouse/
+
+# Python
 __pycache__/
 *.pyc
+.ipynb_checkpoints/
+
+# Spark / Delta local artifacts
+spark-warehouse/
+metastore_db/
+derby.log

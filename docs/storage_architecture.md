@@ -67,7 +67,7 @@ so the same code runs against a local filesystem or object storage.
 
 | Table | Write mode | Partition by | Why |
 |---|---|---|---|
-| `taxi_trips` | overwrite by partition (`replaceWhere`) | `pickup_year_month` | 3 partitions of ~50 MB — see §5 |
+| `taxi_trips` | overwrite by partition (`replaceWhere`) | `pickup_year_month` | 3 partitions of ~125 MB — see §5 |
 | `weather_hourly` | overwrite | none | 8,784 rows, under 1 MB |
 | `air_quality_hourly` | overwrite | none | 8,784 rows after hourly aggregation |
 | `taxi_zones` | overwrite | none | 265 rows, SCD Type 1 |
@@ -87,25 +87,14 @@ YAML, though the observed schema fingerprint is versioned in `ingestion_metadata
 
 ## 4. Naming conventions
 
-Consistent naming is what lets the framework be generic: "the primary key must not be null" can be
-one configurable rule only because every dataset spells its keys the same way. Tables are
-`snake_case`, with the grain as a suffix where it differs from the source (`weather_hourly`).
+Defined in full in the [Common Data Model](common_data_model.md#2-naming-conventions), since the
+conventions belong to the shared representation rather than to the storage layout. In summary:
+columns are lower `snake_case` produced mechanically, timestamps carry `*_ts` and are always UTC,
+every physical measure carries its unit in the name, and platform-generated columns are prefixed
+with `_`.
 
-| Convention | Example | Applies to |
-|---|---|---|
-| `snake_case`, lower case | `passenger_count` | everything |
-| `*_id` | `trip_id`, `pu_location_id` | identifiers and foreign keys |
-| `*_ts` / `*_date` / `*_hour` | `pickup_ts`, `pickup_date`, `obs_hour` | timestamps (always UTC), dates, hour-truncated join keys |
-| `*_amount` | `fare_amount` | money, USD |
-| unit suffix | `trip_distance_mi`, `trip_duration_min`, `temp_c`, `wind_speed_kmh`, `pm25_ugm3` | every physical measure |
-| `is_*` / `*_is_modelled` | `is_store_and_fwd`, `cloud_cover_is_modelled` | booleans and provenance flags |
-| `_*` prefix | `_ingest_run_id`, `_source_file` | platform-generated columns |
-
-Three come from the data rather than taste. `Airport_fee` is the only capitalised column of 19, so
-lower-casing must be mechanical. Unit suffixes are required because distance is in miles, wind in
-km/h, temperature in Celsius and PM2.5 in µg/m³, and only the last states its unit in the source.
-`*_ts` means UTC, which is a claim the normalisation step has to make true given three sources on
-three time bases.
+Tables are `snake_case`, with the grain as a suffix where it differs from the source
+(`weather_hourly`), so a table name states what one of its rows is.
 
 ## 5. Partitioning strategy
 
@@ -114,7 +103,7 @@ the key.
 
 | Table | Rows | Size | Decision |
 |---|---:|---:|---|
-| `taxi_trips` | 9,554,778 | ~160 MB | `pickup_year_month`, 3 partitions |
+| `taxi_trips` | 9,551,907 | 377 MB | `pickup_year_month`, 3 partitions of ~125 MB |
 | `weather_hourly` | 8,784 | < 1 MB | none |
 | `air_quality_hourly` | 8,784 | < 1 MB | none |
 | `taxi_zones` | 265 | 12 KB | none, one file, broadcast |
