@@ -3,11 +3,12 @@
 A Spark + Delta Lake platform that ingests NYC taxi trips, weather, air quality and taxi zone data
 and standardises them into Delta tables that share one set of join keys.
 
-**Status.** The ingestion framework (Task 3) runs end to end and produces the four `silver/` tables.
-The integration pipeline that joins them into `gold/integrated_taxi_trips` (Task 5) and the storage
-benchmark (Task 6) are not implemented yet.
+**Status.** The ingestion framework (Task 3) produces the four `silver/` tables and the integration
+pipeline (Task 5) joins them into `gold/integrated_taxi_trips`. The storage benchmark (Task 6) is
+not implemented yet.
 
 Documentation: [Design Report](docs/design_report.md) ·
+[Architecture Diagram](docs/architecture.md) ·
 [Data Catalog](docs/data_catalog.md) (Task 1) ·
 [Storage Architecture](docs/storage_architecture.md) (Task 2) ·
 [Common Data Model](docs/common_data_model.md) (Task 4)
@@ -15,15 +16,13 @@ Documentation: [Design Report](docs/design_report.md) ·
 ## Running the platform
 
 ```bash
-python jobs/run_ingest.py                      # ingest all four datasets
-python jobs/run_ingest.py weather taxi_zones   # or just these
+python jobs/run_ingest.py                      # 1. ingest all four datasets
+python jobs/run_ingest.py weather taxi_zones   #    or just these
+python jobs/run_integrate.py                   # 2. join them into gold/integrated_taxi_trips
 ```
 
-This is the ingestion pipeline. The integration pipeline that builds the joined `gold/` table is a
-separate job and does not exist yet.
-
-This reads `data/raw/`, writes Delta tables to `data/lakehouse/silver/`, and appends one row per
-dataset to `_meta/ingestion_metadata`. Rejected rows go to `_meta/quarantine` with the rule that
+Ingestion reads `data/raw/`, writes Delta tables to `data/lakehouse/silver/`, and appends one row
+per dataset to `_meta/ingestion_metadata`. Rejected rows go to `_meta/quarantine` with the rule that
 rejected them. A full run takes about four minutes and prints:
 
 ```
@@ -36,6 +35,12 @@ taxi_zones           success           265         265         0    5.62
 
 Re-running is safe. The silver tables are overwritten and the surrogate keys are content hashes, so
 the same input always produces the same result.
+
+`run_integrate.py` joins the four silver tables into `gold/integrated_taxi_trips`, one row per trip
+with the weather and air quality at the pickup hour and the zone and borough of both endpoints. It
+takes about three minutes and appends a coverage row (trips with an exact-hour observation, gap-filled,
+missing) to `_meta/integration_metadata`. Config is `conf/integration.yaml`; the strategy is in
+[Design Report §5](docs/design_report.md).
 
 On Windows, Spark prints `ERROR ShutdownHookManager: Exception while deleting Spark temp dir` when
 it exits. The run has already finished at that point, so ignore it.
@@ -92,5 +97,6 @@ prints a fix for the first thing that fails.
 | Script | What it does | Needs Spark |
 |---|---|---|
 | `jobs/run_ingest.py` | runs the ingestion framework | yes |
+| `jobs/run_integrate.py` | joins the silver tables into `gold/integrated_taxi_trips` | yes |
 | `scripts/check_env.py` | verifies the whole stack end to end | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
