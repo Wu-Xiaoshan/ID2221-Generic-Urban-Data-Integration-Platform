@@ -1,7 +1,7 @@
 # Task 2 — Storage Architecture
 
-Two measurements from the [Data Catalog](data_catalog.md) drive the design: `taxi_trips` is 160 MB
-over 91 days (**1.8 MB per day**), and `air_quality` is 2.2 GB raw but 12 MB relevant (**the first
+Two measurements from the [Data Catalog](data_catalog.md) drive the design: `taxi_trips` is 377 MB
+in silver over 91 days (**4.1 MB per day**), and `air_quality` is 2.2 GB raw but 12 MB relevant (**the first
 filter drops 99.36%**). So fine-grained partitioning costs more than it saves here, and the binding
 constraint on the largest file is read efficiency rather than storage.
 
@@ -108,8 +108,8 @@ the key.
 | `air_quality_hourly` | 8,784 | < 1 MB | none |
 | `taxi_zones` | 265 | 12 KB | none, one file, broadcast |
 
-`pickup_date` looks obvious and at production volume would be right, but here 160 MB over 91 days is
-1.8 MB per partition — about a seventieth of the target — so it would pay 91 file opens and 91 log
+`pickup_date` looks obvious and at production volume would be right, but here 377 MB over 91 days is
+4.1 MB per partition, a thirtieth of the target, so it would pay 91 file opens and 91 log
 entries to skip data that reads in milliseconds. The dirty timestamps make it worse: 21
 out-of-window rows create 96 distinct dates instead of 91, so five extra partitions would hold about
 four records. `pickup_year_month` gives 3 partitions of ~50 MB — still under target but the right
@@ -154,7 +154,7 @@ rejects separate is what makes it useful.
 
 **When does partitioning become harmful?**
 
-- Partitions smaller than a target file. This dataset is the example, at 1.8 MB a day against
+- Partitions smaller than a target file. This dataset is the example, at 4.1 MB a day against
   128 MB; overhead exceeds payload.
 - High-cardinality keys. `(pickup_date, pu_location_id)` would give up to 24,000 directories for
   three months, each with a few hundred rows, and the transaction log grows larger than the data.
@@ -170,9 +170,15 @@ query. Here "large" fails outright, and "named by the query" fails for every ben
 
 **If the data volume increased 20×?** `taxi_trips` would be ~3.2 GB, roughly five years.
 
-- *Partitioning:* daily still holds only 1.8 MB, so it stays wrong; monthly gives ~54 MB across 60
-  partitions, finally in range. So keep `pickup_year_month` — the same key, now correct for the
-  right reason. Daily becomes reasonable around 100×.
+- *Partitioning depends on which axis grows.* A month holds 125 MB and a day 4.1 MB. More time
+  changes neither: months stay at 125 MB and simply become 60 of them, days stay at 4.1 MB, so daily
+  never becomes right through time alone. More trips per day does change it: adding the other fleets
+  grows a day to 83 MB and a month to 2.5 GB, so the key moves to `pickup_date`.
+- *Capacity and retention, which the first case forces even with the layout unchanged.* Delta keeps
+  superseded files until `VACUUM` removes them, and the taxi table held 887 MB of live data in a
+  1,772 MB directory after one `OPTIMIZE`. Ignorable now, not at 20x: `VACUUM` becomes scheduled,
+  `logRetentionDuration` and `deletedFileRetentionDuration` become deliberate, and old partitions
+  become candidates for colder storage.
 - *File layout:* `targetFileSize` to 256 MB, `optimizeWrite` and `autoCompact` mandatory, `OPTIMIZE
   ZORDER` moved to a scheduled job. With liquid clustering available both fact tables would move to
   it, since it lets the clustering key change later without rewriting the table.
