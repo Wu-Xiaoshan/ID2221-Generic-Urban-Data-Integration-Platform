@@ -7,28 +7,32 @@ results. Fuller detail is in [Data Catalog](data_catalog.md),
 
 ## 1. Data catalog
 
-| Dataset | Rows | Primary key | Joins on | Time base |
-|---|---:|---|---|---|
-| `taxi_trips` (fact) | 9,554,778 | none natural, so a hashed `trip_id` | location ids, pickup hour | New York local, with DST |
-| `weather` | 8,784 | `(year, month, day, hour)` | hour | UTC |
-| `air_quality` | 8,139,551 | `(site_id, parameter_code, poc, obs_ts)` | hour | GMT pair; its "local" is EST all year |
-| `taxi_zones` (lookup) | 265 | `LocationID` | `LocationID` | none |
+| | `taxi_trips` (fact) | `weather` | `air_quality` | `taxi_zones` (lookup) |
+|---|---|---|---|---|
+| **1. Primary entity** | one completed metered trip | one hour of weather at a single implicit station | one PM2.5 reading from one instrument at one site in one hour | one TLC taxi zone |
+| **2. Primary key** | none natural, so a hashed surrogate `trip_id` | `(year, month, day, hour)` | `(site_id, parameter_code, poc, obs_ts)` | `LocationID` |
+| **3. Join attributes** | `pu_location_id`, `do_location_id`, `pickup_hour` | `obs_hour` | `obs_hour` (GMT) | `LocationID`, used twice |
+| **4. Temporal attributes** | pickup and dropoff, New York local with DST | one timestamp, split across four integer columns | local and GMT, each split across two columns | none |
+| **5. Categorical attributes** | vendor, ratecode, payment type, and both location ids | `coco` plus ten `*_source` columns | parameter, units, qualifier, method, site | every column |
+| **6. Attributes that grow** | rows, about 38M per year, **and the schema itself** | rows only, 8,760 per year (one per hour) | rows, 8,760 per year per monitor, **and the number of monitors** | nothing since 2015 |
+| Rows in this extract | 9,554,778 | 8,784 | 8,139,551 | 265 |
 
-Four findings decided most of the later design.
+Row 6 decides the storage design: `taxi_trips` grows with events at about 38 million rows a year,
+while the context tables grow with time at one row per hour, so a century of weather is 16 MB and
+never needs partitioning. Four findings decided the rest.
 
-**Three time bases, none of them stated in the data.** We worked two out from the data. Taxi
-pickups bottom out at 04:00 and peak at 18:00, which is a local wall clock. Weather temperature
-bottoms out at hour 10 instead of the physical 05:00, a steady +5 offset, so that file is UTC. For
-the EPA file `GMT - Local` is exactly 5.0 hours on every row with no seasonal change, so its "local"
-is Eastern Standard Time all year while New York's is not. Getting this wrong puts every context
-join four or five hours out and raises no error.
+**Three time bases, none of them stated in the data.** We worked two out from the data. Taxi pickups
+bottom out at 04:00 and peak at 18:00, a local wall clock. Weather temperature bottoms out at hour 10
+instead of the physical 05:00, a steady +5 offset, so that file is UTC. For the EPA file
+`GMT - Local` is exactly 5.0 hours on every row with no seasonal change, so its "local" is Eastern
+Standard Time all year while New York's is not. Getting this wrong puts every context join four or
+five hours out and raises no error.
 
 **The largest file is not the largest table.** `air_quality` is the EPA's national extract, 2.2 GB,
 and only 51,885 rows (0.64%) are in New York City.
 
-**POC has to be in the air-quality key.** Some sites run two instruments at once. The key without
-`POC` has 4,587 duplicates; with it, none. Leaving it out and de-duplicating would delete 4,587 real
-readings.
+**POC has to be in the air-quality key.** Some sites run two instruments at once, so the key without
+`POC` has 4,587 duplicates and with it none. Leaving it out would delete 4,587 real readings.
 
 **Some weather values are model output.** The `*_source` columns show `condition_code` is 98.1%
 `dwd_mosmix` and `cloud_cover_oktas` 43.8%, and `dwd_mosmix` is a forecast model. Nothing in the
@@ -41,13 +45,12 @@ The fact table has no published trip identifier. The candidate key
 ## 2. Storage architecture
 
 Two Delta layers, matching the two stages the assignment asks for. `silver/` holds four tables, one
-per source, with no joins. `gold/` holds the integrated table. `_meta/` holds ingestion metadata and
-quarantine, `benchmark/` the Task 6 variants. We skipped a bronze table: `data/raw/` already lets us
-re-run transformations without fetching the source again, so a Delta copy would duplicate 160 MB and
-pad the Task 6 storage measurement with data no query reads.
-
-Only `taxi_trips` is partitioned, by `pickup_year_month`, giving three partitions of about 125 MB
-against a 128 MB target.
+per source, with no joins; `gold/` holds the integrated table. `_meta/` holds ingestion metadata and
+quarantine, `benchmark/` the Task 6 variants. We skipped a bronze table because `data/raw/` already
+lets us re-run transformations without fetching the source again, so a Delta copy would duplicate
+160 MB and pad the Task 6 storage measurement with data no query reads. Only `taxi_trips` is
+partitioned, by `pickup_year_month`, giving three partitions of about 125 MB against a 128 MB
+target.
 
 ### Which datasets should be treated as lookup tables?
 
@@ -69,8 +72,8 @@ size rule on purpose because we read it while debugging and want each source's r
 
 ### When does partitioning become harmful?
 
-When partitions fall below one target file size, which is our case: `pickup_date` would give 1.8 MB
-per partition over 91 days, a seventieth of the target, paying 91 file opens to skip data that reads
+When partitions fall below one target file size, which is our case: `pickup_date` would give 4.1 MB
+per partition over 91 days, a thirtieth of the target, paying 91 file opens to skip data that reads
 in milliseconds. Also when the key has high cardinality (`(pickup_date, pu_location_id)` would give
 up to 24,000 directories for three months), when queries do not filter on the key, which is true of
 all three Task 6 queries, when partitions are badly skewed, and when the key comes from unvalidated
@@ -78,10 +81,17 @@ data.
 
 ### What would change at 20 times the volume?
 
-`pickup_year_month` stays right, this time for the right reason, at roughly 54 MB across 60
-partitions; daily becomes sensible around 100 times. The context tables would not change, since they
-grow with time rather than with trip count. What would force a redesign is more spatial detail: a
-per-zone weather grid is 265 times larger and crosses the broadcast threshold.
+It depends which axis grows. A month currently holds 125 MB and a day 4.1 MB.
+
+If the extra volume is more time, the layout does not change: months stay at 125 MB and there are
+simply 60 of them, while days stay at 4.1 MB, so daily never becomes right through time alone. What
+changes is operational. Delta keeps superseded files until `VACUUM` runs, and we measured 1,772 MB
+on disk against 887 MB live after one `OPTIMIZE`, so retention and capacity become deliberate
+settings rather than defaults.
+
+If the extra volume is more trips per day, from adding the other fleets, a day grows to 83 MB and a
+month to 2.5 GB, so the key moves to `pickup_date`. The context tables change in neither case: a
+century of hourly weather is 16 MB.
 
 ## 3. Common data model
 
@@ -94,8 +104,8 @@ day, which is a New York day.
 
 **Naming conventions.** Lower `snake_case`, produced mechanically, so `PULocationID` becomes
 `pu_location_id`. We avoided a hand-written rename list because `Airport_fee` is the only capitalised
-column out of 19, so the list would be one line shorter today and stale later. The rename map only
-handles semantic changes, mostly units: distance is in miles, wind in km/h, temperature in Celsius,
+column of 19, so the list would be one line shorter today and stale later. The rename map handles
+only semantic changes, mostly units: distance is in miles, wind in km/h, temperature in Celsius and
 PM2.5 in µg/m³, and only the last states its unit in the source.
 
 **Missing values.** The platform never imputes; there is no `fillna` in `src/`, so a null means the
@@ -141,8 +151,8 @@ Schema, renames, timestamps, casts, drops, quality rules and target layout all l
 `conf/datasets/<name>.yaml`. The rest is registered with a decorator at one of two stages, because
 dataset-specific work sits on both sides of the quality checks. `pre_quality` builds the columns the
 rules test; `post_quality` reshapes data already known to be clean. The air-quality aggregation has
-to be `post_quality`, since de-duplicating on the five-part key must happen first, or a site with two
-instruments contributes twice as much to the city-wide mean as a site with one.
+to be `post_quality`, because the rules are written against per-reading columns that the aggregation
+removes: a negative measurement can only be caught while the individual readings still exist.
 
 ### How is metadata managed?
 
@@ -150,10 +160,12 @@ One row per dataset per run in `_meta/ingestion_metadata`, same schema for every
 status, timings, source files and filter, records read, written and rejected, target path and
 partitioning. It also stores a schema fingerprint, a hash of the source's column names and types,
 and a `schema_drift` field listing missing, unexpected and type-changed columns. On the first run
-the fingerprint reported that `tpep_pickup_datetime` is `timestamp_ntz` rather than `timestamp`,
-which confirms at type level the same no-timezone property we inferred from the demand curve in §1.
-On the current run `taxi_trips` read 9,554,778 rows, wrote 9,551,907 and rejected 2,871 in 183
-seconds: 2,849 implausible durations, 21 timestamps dated 2002, 2008 and 2009, and one duplicate
+the fingerprint caught that `tpep_pickup_datetime` is `timestamp_ntz` rather than `timestamp`,
+confirming at type level the no-timezone property we inferred from the demand curve in §1.
+
+Rejected rows go to `_meta/quarantine` with the rule that rejected them, serialised as JSON so one
+table serves every dataset. `taxi_trips` read 9,554,778 rows, wrote 9,551,907 and rejected 2,871 in
+183 seconds: 2,849 implausible durations, 21 timestamps dated 2002, 2008 and 2009, and one duplicate
 from the DST gap where local 02:30 and 03:30 on 10 March both map to 07:30Z.
 
 ### How does the design reduce duplication and simplify maintenance?

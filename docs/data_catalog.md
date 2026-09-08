@@ -48,7 +48,7 @@ to one row per hour.
 | Join attributes | `obs_hour` only. No spatial key, so every trip in an hour gets the same weather |
 | Temporal | the timestamp is split across four integer columns and must be assembled |
 | Categorical | `coco` (condition code) and ten `*_source` columns |
-| Grows over time | ~8,760 rows a year, negligible here |
+| Grows over time | rows only, 8,760 a year (one per hour). A century would be 16 MB |
 
 Measures: `temp` °C, `rhum` %, `prcp` mm, `wdir` °, `wspd` km/h, `pres` hPa, `cldc` oktas, `coco`
 code. `snwd` and `wpgt` are 100% null and dropped.
@@ -70,7 +70,7 @@ Standard EPA AQS hourly format; column names match the published schema.
 | Join attributes | `obs_hour` (GMT) only. No spatial key to `taxi_zones` |
 | Temporal | `Date/Time Local` and `Date/Time GMT`, each split across two columns |
 | Categorical | `Parameter Name`, `Units of Measure` (both single-valued), `Qualifier`, `Method Type/Code/Name`, `County Name`, `site_id` |
-| Grows over time | rows and monitors; a new pollutant would change the schema |
+| Grows over time | rows, 8,760 a year per monitor, and the monitor count; a new pollutant would change the schema |
 
 - `POC` must be in the key: without it there are 4,587 duplicates, with it 0. Sites run more than
   one instrument (Erie site `360290005`: 13,339 rows over 8,752 hours). Omitting it and then

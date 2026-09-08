@@ -27,10 +27,17 @@ def derive_site_id(df: DataFrame, cfg: DatasetConfig) -> DataFrame:
 def aggregate_city_hourly(df: DataFrame, cfg: DatasetConfig) -> DataFrame:
     """Collapse individual monitor readings into one city-wide value per hour.
 
-    This runs after the quality checks, and the order matters. The uniqueness rule
-    de-duplicates on the five-part key including POC; without that step a site running
-    two instruments would contribute twice as much to the average as a site running one,
-    so the 'city-wide mean' would be weighted by hardware rather than by geography.
+    This runs after the quality checks, and the order matters: the rules are written
+    against per-reading columns (pm25_ugm3_raw, site_id, poc) that this aggregation
+    removes. Checking a null or a negative measurement is only possible while the
+    individual readings still exist.
+
+    The mean is taken over readings rather than over sites. That is safe here because
+    every NYC site runs a single instrument: measured across all 8,784 hours,
+    reading_count equals site_count. Sites with two instruments do exist in the wider
+    file (Erie county has one) but they fall outside the NYC filter. site_count and
+    reading_count are both kept so the assumption stays visible, and a future extract
+    that broke it would show up as the two columns diverging.
 
     A city-wide mean rather than a per-zone value is a deliberate limit. Six monitors
     serve 265 taxi zones, and Manhattan — where most pickups happen — has none, so

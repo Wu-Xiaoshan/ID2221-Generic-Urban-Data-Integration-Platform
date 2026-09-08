@@ -222,11 +222,15 @@ Every transformation applied to every column. Type changes not listed are identi
 | — | `obs_hour` | `date_trunc('hour', obs_ts)` | join key |
 | *(after quality checks)* | `pm25_ugm3`, `pm25_min_ugm3`, `pm25_max_ugm3`, `site_count`, `reading_count` | `groupBy(obs_hour)` aggregation | six monitors → one city-wide hourly value |
 
-The aggregation runs **after** the quality checks, and the order is load-bearing. The uniqueness
-rule de-duplicates on the five-part key including `POC`; without that, a site running two
-instruments would contribute twice as much to the mean as a site running one, so the "city-wide
-average" would be weighted by hardware rather than geography. Measured: 4,587 duplicate rows
-without `POC` in the key, 0 with it.
+The aggregation runs **after** the quality checks, and the order is forced: the rules are written
+against per-reading columns (`pm25_ugm3_raw`, `site_id`, `poc`) that the aggregation removes. A null
+or negative measurement can only be checked while the individual readings still exist.
+
+The mean is taken over readings rather than over sites, which is safe here because every NYC site
+runs one instrument: across all 8,784 hours `reading_count` equals `site_count`. Sites with two
+instruments exist in the wider file, but they fall outside the NYC filter. Both counts are kept in
+the table so the assumption stays visible, and an extract that broke it would show the two columns
+diverging.
 
 ### 5.5 `taxi_zones` — 4 source columns → 5
 
