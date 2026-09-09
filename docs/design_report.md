@@ -169,52 +169,59 @@ would also add a few rule types and format handlers, written once and usable eve
 that would not scale is orchestration: running 24 datasets sequentially in one process needs a
 scheduler with per-dataset retry and dependency ordering.
 
-## 5. Integration pipeline (Task 5)
+## 5. Integration pipeline
 
 `jobs/run_integrate.py` reads the four silver tables and writes `gold/integrated_taxi_trips`: one
 row per trip, plus weather and air quality at the pickup hour and the zone and borough of both
 endpoints. Config is `conf/integration.yaml`, code is `src/urbanplatform/integrate.py`.
 
 Trips drive the join. Every context table broadcasts and every join is a left join on a unique key,
-so the output has the same 9,551,907 rows as silver `taxi_trips` — columns are added, rows are not.
-Three files, one per monthly partition, ~183 seconds. 93,507 trips (1.0%) have a sentinel pickup or
-drop-off zone, flagged `is_unlocated`.
+so the output has the same 9,551,907 rows as silver `taxi_trips`, with columns added but no rows. It
+writes three files, one per monthly partition, in about 183 seconds. 93,507 trips, or 1.0%, have a
+sentinel pickup or drop-off zone and are flagged `is_unlocated`.
 
 ### Associating an hourly observation with a trip
 
-`taxi_trips` carries a UTC `pickup_hour`, both context tables a UTC `obs_hour`; the join is equality
-on those. A trip at 18:42Z gets the 18:00Z observation — nearest hour, always rounding down, so at
-most 59 minutes stale. Rounding to the closer of two observations halves that at the cost of a
-second join, and neither weather nor PM2.5 moves enough within an hour to be worth it. Weather and
-air quality use the same rule; the hourly grain that makes it work is established in §3.
+`taxi_trips` carries a UTC `pickup_hour` and both context tables a UTC `obs_hour`; the join is
+equality on those. A trip at 18:42Z gets the 18:00Z observation. This is the nearest hour, always
+rounding down, so the reading is at most 59 minutes stale. Rounding to the closer of two
+observations would halve that at the cost of a second join, and neither weather nor PM2.5 moves
+enough within an hour to be worth it. Weather and air quality use the same rule. The hourly grain
+that makes it work is established in §3.
+
+Both matched exactly for every trip this run. `weather_hourly` covers all 8,784 hours of 2024. The
+pickup hours span 2024-01-01 05:00Z to 2024-04-01 03:00Z, and `air_quality_hourly` runs from
+2024-01-01 05:00Z to 2025-01-01 04:00Z with no gaps, so it covers every one of them. All 9,551,907
+trips carry a same-hour weather and air-quality reading.
 
 ### Handling missing observations
 
 Each context table is expanded to a gap-free hourly spine before the join. The spine spans the
-first observation to the last, plus `max_gap_hours` (3) at each end; an empty hour — interior gap or
-the padded edge — takes the nearest observation within three hours, closer side winning, ties
-rounding down. Wider gaps stay null. Spine bounds are computed in Spark, not on the driver: a
-timestamp collected to Python is re-read in the driver's local zone and shifts the whole spine by
-the UTC offset — a bug we hit and fixed.
+first observation to the last, plus `max_gap_hours`, currently 3, at each end. An empty hour,
+whether an interior gap or the padded edge, takes the nearest observation within three hours, with
+the closer side winning and ties rounding down. Wider gaps stay null. Spine bounds are computed in
+Spark rather than on the driver, because a timestamp collected to Python is re-read in the driver's
+local zone and shifts the whole spine by the UTC offset. This was a bug we hit and fixed.
 
-Each row records `<name>_offset_hours` (0 = exact, else the fill distance) and `<name>_is_missing`
-for rows still null. Filter `offset_hours = 0` for observations only. Both tables were gap-free for
-2024, so this run wrote 0 filled and 0 missing on both; `_meta/integration_metadata` keeps the
-three counts per run so a monitor outage in a later month shows up without recomputation.
+Each row records `<name>_offset_hours`, which is 0 for an exact hour and otherwise the fill
+distance, and `<name>_is_missing` for rows still null. Filter `offset_hours = 0` for observations
+only. Both tables were gap-free for 2024, so this run wrote 0 filled and 0 missing on both.
+`_meta/integration_metadata` keeps the three counts per run, so a monitor outage in a later month
+shows up without recomputation.
 
 Zones join twice, `pu_location_id` and `do_location_id` against `location_id`, broadcast. Zones 264
-and 265 resolve to `Unknown` / `Outside of NYC` from the lookup; `is_unlocated` carries through for
-borough reporting that needs to drop them.
+and 265 resolve to `Unknown` or `Outside of NYC` from the lookup, and `is_unlocated` carries through
+for borough reporting that needs to drop them.
 
 ### Limitations
 
 | Limitation | Consequence |
 |---|---|
-| One city-wide weather and air-quality value per hour | A Staten Island trip carries Manhattan's readings. Six PM2.5 monitors, none in Manhattan — see §6 |
+| One city-wide weather and air-quality value per hour | A Staten Island trip carries Manhattan's readings. Six PM2.5 monitors serve the city and none is in Manhattan. See §6 |
 | Hour truncation | Context up to 59 minutes old |
 | Pickup only, not drop-off | A long trip into changing weather keeps its pickup conditions |
-| Gap fill up to 3 hours | A filled value can be a 3-hour-old reading; `offset_hours` records which |
-| Weather is one implied station | No spatial weather resolution — a limit of the source |
+| Gap fill up to 3 hours | A filled value can be a 3-hour-old reading, recorded in `offset_hours` |
+| Weather is one implied station | No spatial weather resolution, a limit of the source data |
 
 When `air_quality_is_missing` is true the row stays, with null PM2.5; dropping such rows would move
 every borough count in Task 6. No Q1 2024 row is in that state, but a quarter with a monitor outage

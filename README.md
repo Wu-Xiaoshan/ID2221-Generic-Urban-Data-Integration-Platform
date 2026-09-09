@@ -38,9 +38,8 @@ the same input always produces the same result.
 
 `run_integrate.py` joins the four silver tables into `gold/integrated_taxi_trips`, one row per trip
 with the weather and air quality at the pickup hour and the zone and borough of both endpoints. It
-takes about three minutes and appends a coverage row (trips with an exact-hour observation, gap-filled,
-missing) to `_meta/integration_metadata`. Config is `conf/integration.yaml`; the strategy is in
-[Design Report §5](docs/design_report.md).
+takes about three minutes and appends a coverage row to `_meta/integration_metadata`. Config is
+`conf/integration.yaml`; the strategy is in [Design Report §5](docs/design_report.md).
 
 On Windows, Spark prints `ERROR ShutdownHookManager: Exception while deleting Spark temp dir` when
 it exits. The run has already finished at that point, so ignore it.
