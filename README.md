@@ -45,11 +45,13 @@ takes about four minutes and appends a coverage row to `_meta/integration_metada
 On Windows, Spark prints `ERROR ShutdownHookManager: Exception while deleting Spark temp dir` when
 it exits. The run has already finished at that point, so ignore it.
 
-Reading a table afterwards:
+Reading the result:
 
 ```python
-spark.read.format("delta").load("data/lakehouse/silver/taxi_trips")
+spark.read.format("delta").load("data/lakehouse/gold/integrated_taxi_trips")
 ```
+
+The four silver tables under `data/lakehouse/silver/` load the same way.
 
 ## Adding a dataset
 

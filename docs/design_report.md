@@ -241,21 +241,23 @@ will be.
 
 ## 6. Engineering decisions and trade-offs
 
-| Decision | Alternative | Why, and what it costs |
+| Decision | Alternative | Reason and cost |
 |---|---|---|
-| Surrogate key is `xxhash64` (bigint) | `sha2(...,256)` hex | The sha2 column alone was 589 MB of an 888 MB table. xxhash64 brought it to 377 MB, 58% smaller. Costs a collision probability of about 2.6e-6, and this is not a cryptographic use |
-| Key is a hash, not a generated id | `monotonically_increasing_id()` | Re-ingestion becomes idempotent |
-| No bronze layer | Full medallion | Saves a redundant 160 MB copy. Costs replaying from Delta rather than from raw files |
-| Air-quality filter at read time | Land first, filter after | Avoids moving 2.2 GB to keep 12 MB. Costs the only exception to "raw files are the landing zone" |
-| Money as `double` | `decimal(10,2)` | Matches the source and nothing here accumulates money precisely. A simplification we know about, since `double` is not really right for currency |
-| City-wide hourly air quality | Nearest monitor per zone | Six monitors cover 265 zones and Manhattan has none, where most pickups happen. Per-zone values would look more precise than the data is |
-| `taxi_zones` as SCD Type 1 | Type 2 with history | Zones stable since 2015. A later renaming would retroactively change historical reports |
-| Anomalies flagged, not rejected | Reject on any failure | Keeps 2.2% of trips that are implausible but real. Costs consumers having to read the `dq_*` flags |
+| Surrogate key is `xxhash64` (bigint) | `sha2(...,256)` hex | The sha2 column was 589 MB of an 888 MB table. xxhash64 made the table 377 MB, 58% smaller. Collision chance is about 2.6e-6, and nothing here needs a secure hash |
+| A hash, not a generated id | `monotonically_increasing_id()` | Re-running ingestion produces the same keys, so it does not duplicate rows |
+| No bronze layer | Full medallion | Saves a second 160 MB copy of the trips. We replay from the raw files rather than from Delta |
+| Air-quality filter during the read | Land it, then filter | Avoids moving 2.2 GB to keep 12 MB. It is the one place where raw and silver do not match row for row |
+| Money as `double` | `decimal(10,2)` | Matches the source, and we never add money up precisely. We know `double` is not really correct for currency |
+| City-wide hourly air quality | Nearest monitor per zone | Six monitors cover 265 zones and none is in Manhattan, where most pickups are. Per-zone values would look more precise than they are |
+| `taxi_zones` overwritten each run | SCD Type 2 with history | Zones have not changed since 2015. If one is renamed later, old reports change with it |
+| Odd values flagged, not rejected | Reject whenever a rule fails | Keeps 2.2% of trips that look wrong but are real. Anyone querying has to check the `dq_*` columns |
 
-One bug is worth recording because it changed the data model. We wrote the temporal range rule as
-`max: "2024-04-01"`, a local calendar date, but `pickup_ts` was already UTC, and local
-2024-03-31T20:00 is 2024-04-01T00:00Z. The rule threw out 16,721 legitimate rush-hour trips. Our
-first fix was to pad the bounds by a day, which let one trip at 00:34 on 1 April through and created
-a fourth partition holding a single row, which is the failure the rule exists to prevent. Writing the
-bounds as UTC instants fixed it properly, and that is why §3 keeps UTC join keys and local calendar
-columns separate.
+We also hit one bug worth keeping here, because the split in §3 between UTC join keys and local
+calendar columns came out of it. The range rule said `max: "2024-04-01"`, which we meant as the end
+of local March, but `pickup_ts` is UTC and that string reads as an instant, so the cut-off was 20:00
+on 31 March in New York. It rejected 16,721 rush-hour trips and the run still said success. Widening
+the bounds brought them back and showed the same mistake in a second place: `pickup_year_month` was
+also built from the UTC timestamp, so those trips went into a `2024-04` partition despite happening
+in local March. Fixing the bounds did nothing for that, since the partition column never looked at
+them. Only deriving the calendar columns with `from_utc_timestamp` gave the three partitions we
+expected.
