@@ -4,19 +4,21 @@ A Spark + Delta Lake platform that ingests NYC taxi trips, weather, air quality 
 and standardises them into Delta tables that share one set of join keys.
 
 **Status.** The ingestion framework (Task 3) runs end to end and produces the four `silver/` tables.
-The integration pipeline that joins them into `gold/integrated_taxi_trips` (Task 5) and the storage
-benchmark (Task 6) are not implemented yet.
+ The integration pipeline that joins them into gold/integrated_taxi_trips (Task 5) is not implemented yet.
+ The storage benchmark (Task 6) is implemented and evaluates partitioning strategies.
 
 Documentation: [Design Report](docs/design_report.md) ·
 [Data Catalog](docs/data_catalog.md) (Task 1) ·
 [Storage Architecture](docs/storage_architecture.md) (Task 2) ·
 [Common Data Model](docs/common_data_model.md) (Task 4)
+[Benchmark Report](docs/benchmark_report.md) (Task 6)
 
 ## Running the platform
 
 ```bash
 python jobs/run_ingest.py                      # ingest all four datasets
 python jobs/run_ingest.py weather taxi_zones   # or just these
+python jobs/run_benchmark.py                   # run the storage benchmark (Task 6)
 ```
 
 This is the ingestion pipeline. The integration pipeline that builds the joined `gold/` table is a
@@ -94,3 +96,5 @@ prints a fix for the first thing that fails.
 | `jobs/run_ingest.py` | runs the ingestion framework | yes |
 | `scripts/check_env.py` | verifies the whole stack end to end | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
+| `jobs/run_benchmark.py` | evaluates storage strategies and query latency for Task 6 | yes |
+
