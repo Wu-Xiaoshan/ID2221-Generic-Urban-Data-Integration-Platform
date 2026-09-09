@@ -1,17 +1,8 @@
 # Urban Data Integration Platform
 
-A Spark + Delta Lake platform that ingests NYC taxi trips, weather, air quality and taxi zone data
-and standardises them into Delta tables that share one set of join keys.
-
-**Status.** The ingestion framework (Task 3) produces the four `silver/` tables and the integration
-pipeline (Task 5) joins them into `gold/integrated_taxi_trips`. The storage benchmark (Task 6) is
-not implemented yet.
-
-Documentation: [Design Report](docs/design_report.md) ·
-[Architecture Diagram](docs/architecture.md) ·
-[Data Catalog](docs/data_catalog.md) (Task 1) ·
-[Storage Architecture](docs/storage_architecture.md) (Task 2) ·
-[Common Data Model](docs/common_data_model.md) (Task 4)
+A Spark + Delta Lake platform that ingests NYC taxi trips, weather, air quality and taxi zone data,
+standardises them into Delta tables that share one set of join keys, and integrates them into a
+single analytical table with one row per trip.
 
 ## Running the platform
 
@@ -38,8 +29,8 @@ the same input always produces the same result.
 
 `run_integrate.py` joins the four silver tables into `gold/integrated_taxi_trips`, one row per trip
 with the weather and air quality at the pickup hour and the zone and borough of both endpoints. It
-takes about three minutes and appends a coverage row to `_meta/integration_metadata`. Config is
-`conf/integration.yaml`; the strategy is in [Design Report §5](docs/design_report.md).
+takes about four minutes and appends a coverage row to `_meta/integration_metadata`. Config is
+`conf/integration.yaml`.
 
 On Windows, Spark prints `ERROR ShutdownHookManager: Exception while deleting Spark temp dir` when
 it exits. The run has already finished at that point, so ignore it.
