@@ -1,0 +1,56 @@
+# Integration pipeline configuration.
+
+name: integrated_taxi_trips
+description: One row per taxi trip, enriched with pickup-hour weather and air quality
+  and with pickup/drop-off zone and borough.
+
+fact:
+  table: taxi_trips          # silver
+  # UTC, hour-truncated. Derived in the taxi_trips transform precisely so that this
+  # join is possible; see docs/common_data_model.md section 1.1.
+  hour_column: pickup_hour
+
+# Each context source is densified to a gap-free hourly spine before the join, so the
+# join itself is a plain equi-join on the pickup hour.
+context:
+  - name: weather
+    table: weather_hourly
+    hour_column: obs_hour
+    max_gap_hours: 3
+    columns:
+      temp_c: weather_temp_c
+      humidity_pct: weather_humidity_pct
+      precipitation_mm: weather_precipitation_mm
+      wind_speed_kmh: weather_wind_speed_kmh
+      wind_direction_deg: weather_wind_direction_deg
+      pressure_hpa: weather_pressure_hpa
+      cloud_cover_oktas: weather_cloud_cover_oktas
+      condition_code: weather_condition_code
+
+  - name: air_quality
+    table: air_quality_hourly
+    hour_column: obs_hour
+    max_gap_hours: 3
+    columns:
+      pm25_ugm3: aq_pm25_ugm3
+      pm25_max_ugm3: aq_pm25_max_ugm3
+      site_count: aq_site_count
+
+# taxi_zones is a lookup: broadcast, joined twice (pickup and drop-off).
+zones:
+  table: taxi_zones
+  key: location_id
+  columns: [borough, zone]
+  lookups:
+    - fact_key: pu_location_id
+      prefix: pickup
+    - fact_key: do_location_id
+      prefix: dropoff
+
+target:
+  table: integrated_taxi_trips
+  layer: gold
+  mode: overwrite
+  # Same access pattern as the fact table: filtered by month, then by pickup location.
+  partition_by: [pickup_year_month]
+  zorder_by: [pu_location_id]
