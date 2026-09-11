@@ -31,7 +31,7 @@ flowchart TD
 
     S6 --> T1 & T2 & T3 & T4
     S5 -. rejected rows .-> Q["_meta/quarantine"]
-    fw -. one row per dataset per run .-> M["_meta/ingestion_metadata"]
+    S6 -. one row per dataset per run .-> M["_meta/ingestion_metadata"]
 
     subgraph integ["Integration pipeline · integrate.py, conf/integration.yaml"]
         direction TB
@@ -50,7 +50,7 @@ flowchart TD
     end
 
     I3 --> G
-    integ -. coverage: exact / filled / missing .-> MI["_meta/integration_metadata"]
+    I3 -. coverage: exact / filled / missing .-> MI["_meta/integration_metadata"]
 
     subgraph bench["Benchmark · jobs/run_benchmark.py"]
         B1["bench_taxi_daily\nstrategy A: partitionBy(pickup_date)"]

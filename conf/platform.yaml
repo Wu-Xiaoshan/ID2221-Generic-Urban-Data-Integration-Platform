@@ -29,11 +29,13 @@ spark:
     spark.sql.extensions: io.delta.sql.DeltaSparkSessionExtension
     spark.sql.catalog.spark_catalog: org.apache.spark.sql.delta.catalog.DeltaCatalog
 
-    # Delta file layout. targetFileSize is deliberately larger than any partition
-    # this dataset produces; see docs/storage_architecture.md section 5.
+    # Delta file layout. OPTIMIZE packs files up to optimize.maxFileSize, set here to
+    # its 1 GiB default so the value is visible. Every partition in this dataset is
+    # well below it, so each compacts to one file. Open-source Delta has no
+    # targetFileSize setting; that key is Databricks-only and would be ignored.
     spark.databricks.delta.optimizeWrite.enabled: "true"
     spark.databricks.delta.autoCompact.enabled: "true"
-    spark.databricks.delta.targetFileSize: 134217728
+    spark.databricks.delta.optimize.maxFileSize: 1073741824
 
     spark.sql.shuffle.partitions: "8"
     spark.sql.adaptive.enabled: "true"

@@ -79,8 +79,9 @@ Both context tables end at 8,784 rows, one per hour of 2024. `weather` arrives t
 `air_quality` gets there by averaging six monitors and three POCs into a city-wide hourly value.
 Giving them the same grain and join key is the point of the silver layer.
 
-Delta settings in `conf/platform.yaml`: `targetFileSize = 128MB` with `optimizeWrite` and
-`autoCompact` on the fact tables, `OPTIMIZE` after ingesting a partitioned table, and `VACUUM` at
+Delta settings in `conf/platform.yaml`: `optimize.maxFileSize` at its 1 GiB default, so each
+partition compacts to one file, `optimizeWrite` and `autoCompact` on the fact tables, `OPTIMIZE`
+after ingesting a partitioned table, and `VACUUM` at
 the default 7-day retention. Schema evolution is declared rather than automatic — a new upstream
 column (the 2025 files add `cbd_congestion_fee`) reaches a table only once it is in the dataset
 YAML, though the observed schema fingerprint is versioned in `ingestion_metadata` either way.
@@ -186,9 +187,10 @@ query. Here "large" fails outright, and "named by the query" fails for every ben
   1,772 MB directory after one `OPTIMIZE`. Ignorable now, not at 20x: `VACUUM` becomes scheduled,
   `logRetentionDuration` and `deletedFileRetentionDuration` become deliberate, and old partitions
   become candidates for colder storage.
-- *File layout:* `targetFileSize` to 256 MB, `optimizeWrite` and `autoCompact` mandatory, `OPTIMIZE
-  ZORDER` moved to a scheduled job. With liquid clustering available both fact tables would move to
-  it, since it lets the clustering key change later without rewriting the table.
+- *File layout:* `optimizeWrite` and `autoCompact` mandatory, `OPTIMIZE ZORDER` moved to a scheduled
+  job, and `optimize.maxFileSize` left at 1 GiB, since no partition gets near it in either case. With
+  liquid clustering available both fact tables would move to it, since it lets the clustering key
+  change later without rewriting the table.
 - *Ingestion:* full overwrite stops working; incremental `replaceWhere` over the affected months,
   with deletion vectors so corrections don't rewrite whole files.
 - *Context tables:* nothing changes. They grow with time, not trip count — twenty years of hourly
