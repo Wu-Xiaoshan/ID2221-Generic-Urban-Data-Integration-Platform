@@ -1,4 +1,4 @@
-"""Profile the raw source files and print the measurements quoted in docs/data_catalog.md.
+"""Profile the raw source files and print the measurements quoted in the data catalog.
 
 Runs on plain pandas + pyarrow (no Spark, no JVM) so the data catalog can be verified
 before the platform itself is stood up.

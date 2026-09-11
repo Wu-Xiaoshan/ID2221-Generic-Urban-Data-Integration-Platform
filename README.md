@@ -44,6 +44,32 @@ spark.read.format("delta").load("data/lakehouse/gold/integrated_taxi_trips")
 
 The four silver tables under `data/lakehouse/silver/` load the same way.
 
+## Project layout
+
+```
+DesignReportWeek1.pdf         the design report
+ArchitectureDiagramWeek1.pdf  the architecture diagram
+BenchmarkReportWeek1.pdf      the benchmark report
+README.md                     this file
+conf/
+  platform.yaml               Spark settings and the lakehouse root
+  datasets/*.yaml             one file per dataset: source, schema, renames, timestamps, quality rules
+  integration.yaml            how the integration joins the four tables
+src/urbanplatform/            the ingestion framework and the integration pipeline
+  ingest.py                   one pipeline that runs every dataset
+  integrate.py                builds gold/integrated_taxi_trips
+  transforms/                 the only dataset-specific code
+jobs/                         entry points: run_ingest.py, run_integrate.py, run_benchmark.py
+scripts/                      check_env.py and profile_raw.py
+docs/common_data_model.md     the common data model, with every column transformation listed
+data/raw/                     source files, not included (see Setup)
+data/lakehouse/               created by the jobs
+  silver/                     one Delta table per dataset
+  gold/                       integrated_taxi_trips
+  benchmark/                  the two storage variants the benchmark compares
+  _meta/                      ingestion_metadata, integration_metadata, quarantine
+```
+
 ## Adding a dataset
 
 Write `conf/datasets/<name>.yaml` declaring the source, expected schema, renames, timestamps, casts

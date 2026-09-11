@@ -128,7 +128,7 @@ target:
   table: taxi_trips
   layer: silver
   mode: overwrite
-  # Three ~50 MB partitions. Daily would give 91 partitions of 1.8 MB each; see
-  # docs/storage_architecture.md section 5.
+  # Three partitions of about 120 MB. Daily would give 91 of about 4 MB each, far
+  # below one target file; see the storage architecture section of the design report.
   partition_by: [pickup_year_month]
   zorder_by: [pu_location_id]

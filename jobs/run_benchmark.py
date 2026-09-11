@@ -1,5 +1,5 @@
 """Task 6: rewrite silver/taxi_trips two ways under benchmark/ and measure ingestion time,
-storage size, file count and query latency on both. Method and results in docs/benchmark_report.md.
+storage size, file count and query latency on both. Method and results are in the benchmark report.
 """
 
 from __future__ import annotations
@@ -159,7 +159,7 @@ def measure_queries(spark, views: dict[str, str], probe_date) -> dict[str, dict[
 
 
 def report(results: dict, latencies: dict) -> None:
-    """Print the results as the Markdown table docs/benchmark_report.md carries."""
+    """Print the results as a Markdown table, ready to paste into the benchmark report."""
     names = list(results)
     width = max(len(n) for n in names) + 4
 
