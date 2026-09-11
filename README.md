@@ -4,22 +4,13 @@ A Spark + Delta Lake platform that ingests NYC taxi trips, weather, air quality 
 standardises them into Delta tables that share one set of join keys, and integrates them into a
 single analytical table with one row per trip.
 
-**Status.** The ingestion framework (Task 3) runs end to end and produces the four `silver/` tables.
-The integration pipeline (Task 5) and the storage benchmark (Task 6) are both implemented.
-
-Documentation: [Design Report](docs/design_report.md) ·
-[Data Catalog](docs/data_catalog.md) (Task 1) ·
-[Storage Architecture](docs/storage_architecture.md) (Task 2) ·
-[Common Data Model](docs/common_data_model.md) (Task 4) ·
-[Benchmark Report](docs/benchmark_report.md) (Task 6)
-
 ## Running the platform
 
 ```bash
 python jobs/run_ingest.py                      # 1. ingest all four datasets
 python jobs/run_ingest.py weather taxi_zones   #    or just these
 python jobs/run_integrate.py                   # 2. join them into gold/integrated_taxi_trips
-python jobs/run_benchmark.py                   # 3. run the storage benchmark (Task 6)
+python jobs/run_benchmark.py                   # 3. compare the two storage strategies
 ```
 
 Ingestion reads `data/raw/`, writes Delta tables to `data/lakehouse/silver/`, and appends one row
@@ -101,6 +92,5 @@ prints a fix for the first thing that fails.
 | `jobs/run_ingest.py` | runs the ingestion framework | yes |
 | `jobs/run_integrate.py` | joins the silver tables into `gold/integrated_taxi_trips` | yes |
 | `scripts/check_env.py` | verifies the whole stack end to end | yes |
+| `jobs/run_benchmark.py` | rewrites the fact table two ways and measures both | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
-| `jobs/run_benchmark.py` | evaluates storage strategies and query latency for Task 6 | yes |
-

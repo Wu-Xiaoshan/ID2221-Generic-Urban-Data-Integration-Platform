@@ -52,9 +52,9 @@ flowchart TD
     I3 --> G
     integ -. coverage: exact / filled / missing .-> MI["_meta/integration_metadata"]
 
-    subgraph bench["Benchmark · Task 6, not yet implemented"]
-        B1["strategy A: daily partitions"]
-        B2["strategy B: unpartitioned + ZORDER"]
+    subgraph bench["Benchmark · jobs/run_benchmark.py"]
+        B1["bench_taxi_daily\nstrategy A: partitionBy(pickup_date)"]
+        B2["bench_taxi_zordered\nstrategy B: unpartitioned + ZORDER pu_location_id"]
     end
     T1 -. rewritten two ways .-> B1 & B2
 ```
