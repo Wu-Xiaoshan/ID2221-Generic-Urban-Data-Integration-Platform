@@ -122,9 +122,15 @@ within files and lets Delta skip files by statistics, giving most of the pruning
 directory explosion.
 
 Daily partitioning is kept as Strategy A in Task 6 so its cost is measured rather than asserted;
-Strategy B is unpartitioned plus `OPTIMIZE ... ZORDER BY (pu_location_id)`. We expect A to lose on
+Strategy B is unpartitioned plus `OPTIMIZE ... ZORDER BY (pu_location_id)`. We expected A to lose on
 all four metrics, since none of the three benchmark queries filters on a date and so none can prune,
-while all pay the file-open overhead. If the numbers disagree, `benchmark_report.md` will say so.
+while all pay the file-open overhead. It loses on two. A is 8-27% slower on all three queries and
+produces 91 files averaging 3.3 MB, as expected — but it is also the faster write (38.0 s against
+82.9 s, because Z-ordering rewrites the whole table) and the smaller table (300.6 MB against
+359.3 MB, because a day's worth of timestamps encodes tightly inside one file). The decision stands
+and its reasoning narrows: daily partitioning is wrong here because the partitions are two orders of
+magnitude too small and no query names the key, not because it is expensive to write or to store.
+[`benchmark_report.md`](benchmark_report.md) has the numbers.
 
 ## 6. Design discussion
 
@@ -159,7 +165,8 @@ rejects separate is what makes it useful.
 - High-cardinality keys. `(pickup_date, pu_location_id)` would give up to 24,000 directories for
   three months, each with a few hundred rows, and the transaction log grows larger than the data.
 - Queries that don't filter on the key. A full scan of a partitioned table is slower than of an
-  unpartitioned one, and all three Task 6 queries are like this.
+  unpartitioned one, and all three Task 6 queries are like this — measured at 8-27% slower. Pruning
+  needs a `WHERE`; a `GROUP BY` on the partition column still reads every partition.
 - Skew. Partitioning by borough puts Manhattan next to Staten Island — 69 zones against 20, and much
   worse by trip volume — so parallelism drops to the slowest partition.
 - Keys from unvalidated or changeable data. The 21 bad timestamps are the mild case; the serious one

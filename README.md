@@ -10,6 +10,7 @@ single analytical table with one row per trip.
 python jobs/run_ingest.py                      # 1. ingest all four datasets
 python jobs/run_ingest.py weather taxi_zones   #    or just these
 python jobs/run_integrate.py                   # 2. join them into gold/integrated_taxi_trips
+python jobs/run_benchmark.py                   # 3. compare the two storage strategies
 ```
 
 Ingestion reads `data/raw/`, writes Delta tables to `data/lakehouse/silver/`, and appends one row
@@ -91,4 +92,5 @@ prints a fix for the first thing that fails.
 | `jobs/run_ingest.py` | runs the ingestion framework | yes |
 | `jobs/run_integrate.py` | joins the silver tables into `gold/integrated_taxi_trips` | yes |
 | `scripts/check_env.py` | verifies the whole stack end to end | yes |
+| `jobs/run_benchmark.py` | rewrites the fact table two ways and measures both | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
