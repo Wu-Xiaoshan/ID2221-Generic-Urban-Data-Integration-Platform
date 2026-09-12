@@ -15,7 +15,7 @@ python jobs/run_benchmark.py                   # 3. compare the two storage stra
 
 Ingestion reads `data/raw/`, writes Delta tables to `data/lakehouse/silver/`, and appends one row
 per dataset to `_meta/ingestion_metadata`. Rejected rows go to `_meta/quarantine` with the rule that
-rejected them. A full run takes about four minutes and prints:
+rejected them. A full run takes a few minutes and prints:
 
 ```
 dataset              status           read     written  rejected     sec
@@ -30,7 +30,8 @@ the same input always produces the same result.
 
 `run_integrate.py` joins the four silver tables into `gold/integrated_taxi_trips`, one row per trip
 with the weather and air quality at the pickup hour and the zone and borough of both endpoints. It
-takes about four minutes and appends a coverage row to `_meta/integration_metadata`. Config is
+takes three to four minutes (also subject to the same run-to-run variance as ingestion) and appends
+a coverage row to `_meta/integration_metadata`. Config is
 `conf/integration.yaml`.
 
 On Windows, Spark prints `ERROR ShutdownHookManager: Exception while deleting Spark temp dir` when
