@@ -1,5 +1,8 @@
-# Local documents
+# Local documents, except the three the assignment asks to hand in.
 *.pdf
+!/DesignReportWeek1.pdf
+!/ArchitectureDiagramWeek1.pdf
+!/BenchmarkReportWeek1.pdf
 
 # Source datasets: downloaded, not authored here (~2.4 GB).
 # Keep the empty folders so a fresh clone knows where the files go. Un-ignoring a
@@ -24,3 +27,8 @@ __pycache__/
 spark-warehouse/
 metastore_db/
 derby.log
+
+# Working documents. README lists docs/common_data_model.md as the only one
+# that ships; the rest are drafts behind the three PDFs.
+/docs/*
+!/docs/common_data_model.md
