@@ -1,0 +1,70 @@
+# partition_pruning_vs_full_scan / MONTH(pickup_date) = 2, unskippable
+
+== Physical Plan ==
+AdaptiveSparkPlan (11)
++- Sort (10)
+   +- Exchange (9)
+      +- SortAggregate (8)
+         +- Sort (7)
+            +- Exchange (6)
+               +- SortAggregate (5)
+                  +- Sort (4)
+                     +- Project (3)
+                        +- Filter (2)
+                           +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [5]: [pu_location_id#105, pickup_date#125, pickup_borough#147, pickup_zone#148, pickup_year_month#126]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [IsNotNull(pickup_date), Not(In(pu_location_id, [264,265]))]
+ReadSchema: struct<pu_location_id:int,pickup_date:date,pickup_borough:string,pickup_zone:string>
+
+(2) Filter
+Input [5]: [pu_location_id#105, pickup_date#125, pickup_borough#147, pickup_zone#148, pickup_year_month#126]
+Condition : ((isnotnull(pickup_date#125) AND (month(pickup_date#125) = 2)) AND NOT pu_location_id#105 IN (264,265))
+
+(3) Project
+Output [4]: [pu_location_id#105, pickup_year_month#126, pickup_borough#147, pickup_zone#148]
+Input [5]: [pu_location_id#105, pickup_date#125, pickup_borough#147, pickup_zone#148, pickup_year_month#126]
+
+(4) Sort
+Input [4]: [pu_location_id#105, pickup_year_month#126, pickup_borough#147, pickup_zone#148]
+Arguments: [pickup_year_month#126 ASC NULLS FIRST, pu_location_id#105 ASC NULLS FIRST], false, 0
+
+(5) SortAggregate
+Input [4]: [pu_location_id#105, pickup_year_month#126, pickup_borough#147, pickup_zone#148]
+Keys [2]: [pickup_year_month#126, pu_location_id#105]
+Functions [3]: [partial_max(pickup_zone#148), partial_max(pickup_borough#147), partial_count(1)]
+Aggregate Attributes [3]: [max#3170, max#3171, count#3172L]
+Results [5]: [pickup_year_month#126, pu_location_id#105, max#3173, max#3174, count#3175L]
+
+(6) Exchange
+Input [5]: [pickup_year_month#126, pu_location_id#105, max#3173, max#3174, count#3175L]
+Arguments: hashpartitioning(pickup_year_month#126, pu_location_id#105, 8), ENSURE_REQUIREMENTS, [plan_id=1780]
+
+(7) Sort
+Input [5]: [pickup_year_month#126, pu_location_id#105, max#3173, max#3174, count#3175L]
+Arguments: [pickup_year_month#126 ASC NULLS FIRST, pu_location_id#105 ASC NULLS FIRST], false, 0
+
+(8) SortAggregate
+Input [5]: [pickup_year_month#126, pu_location_id#105, max#3173, max#3174, count#3175L]
+Keys [2]: [pickup_year_month#126, pu_location_id#105]
+Functions [3]: [max(pickup_zone#148), max(pickup_borough#147), count(1)]
+Aggregate Attributes [3]: [max(pickup_zone#148)#3091, max(pickup_borough#147)#3092, count(1)#3090L]
+Results [5]: [pickup_year_month#126, pu_location_id#105, max(pickup_zone#148)#3091 AS pickup_zone#3019, max(pickup_borough#147)#3092 AS pickup_borough#3020, count(1)#3090L AS trip_count#3021L]
+
+(9) Exchange
+Input [5]: [pickup_year_month#126, pu_location_id#105, pickup_zone#3019, pickup_borough#3020, trip_count#3021L]
+Arguments: rangepartitioning(trip_count#3021L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=1784]
+
+(10) Sort
+Input [5]: [pickup_year_month#126, pu_location_id#105, pickup_zone#3019, pickup_borough#3020, trip_count#3021L]
+Arguments: [trip_count#3021L DESC NULLS LAST], true, 0
+
+(11) AdaptiveSparkPlan
+Output [5]: [pickup_year_month#126, pu_location_id#105, pickup_zone#3019, pickup_borough#3020, trip_count#3021L]
+Arguments: isFinalPlan=false
+
+

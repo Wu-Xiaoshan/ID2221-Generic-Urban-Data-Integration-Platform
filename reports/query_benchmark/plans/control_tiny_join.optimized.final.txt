@@ -1,0 +1,77 @@
+# control_tiny_join / threshold = 32 MB
+
+AdaptiveSparkPlan isFinalPlan=true
++- == Final Plan ==
+   *(9) Project [day_of_week#35813, local_hour#35936, avg_trips_per_occurrence#35815, total_trips#35814L, rank_in_day#35816, pct_of_day_total#35817]
+   +- *(9) Sort [day_of_week_num#35938 ASC NULLS FIRST, rank_in_day#35816 ASC NULLS FIRST], true, 0
+      +- AQEShuffleRead coalesced
+         +- ShuffleQueryStage 5
+            +- Exchange rangepartitioning(day_of_week_num#35938 ASC NULLS FIRST, rank_in_day#35816 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=21040]
+               +- *(8) Project [day_of_week#35813, local_hour#35936, avg_trips_per_occurrence#35815, total_trips#35814L, rank_in_day#35816, round(((100.0 * cast(total_trips#35814L as decimal(20,0))) / cast(_we1#36003L as decimal(20,0))), 2) AS pct_of_day_total#35817, day_of_week_num#35938]
+                  +- *(8) Filter (rank_in_day#35816 <= 3)
+                     +- Window [sum(total_trips#35814L) windowspecdefinition(day_of_week_num#35938, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we1#36003L], [day_of_week_num#35938]
+                        +- Window [rank(total_trips#35814L) windowspecdefinition(day_of_week_num#35938, total_trips#35814L DESC NULLS LAST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rank_in_day#35816], [day_of_week_num#35938], [total_trips#35814L DESC NULLS LAST]
+                           +- *(7) Sort [day_of_week_num#35938 ASC NULLS FIRST, total_trips#35814L DESC NULLS LAST], false, 0
+                              +- AQEShuffleRead coalesced
+                                 +- ShuffleQueryStage 4
+                                    +- Exchange hashpartitioning(day_of_week_num#35938, 8), ENSURE_REQUIREMENTS, [plan_id=20958]
+                                       +- *(6) Project [day_of_week_num#35938, day_of_week#35813, local_hour#35936, total_trips#35814L, round((cast(total_trips#35814L as double) / cast(occurrences#35812L as double)), 1) AS avg_trips_per_occurrence#35815]
+                                          +- *(6) BroadcastHashJoin [day_of_week_num#35938], [day_of_week_num#35875], Inner, BuildRight, false
+                                             :- SortAggregate(key=[day_of_week_num#35938, local_hour#35936], functions=[max(day_of_week#35937), count(1)], output=[day_of_week_num#35938, day_of_week#35813, local_hour#35936, total_trips#35814L])
+                                             :  +- *(5) Sort [day_of_week_num#35938 ASC NULLS FIRST, local_hour#35936 ASC NULLS FIRST], false, 0
+                                             :     +- AQEShuffleRead coalesced
+                                             :        +- ShuffleQueryStage 0
+                                             :           +- Exchange hashpartitioning(day_of_week_num#35938, local_hour#35936, 8), ENSURE_REQUIREMENTS, [plan_id=20603]
+                                             :              +- SortAggregate(key=[day_of_week_num#35938, local_hour#35936], functions=[partial_max(day_of_week#35937), partial_count(1)], output=[day_of_week_num#35938, local_hour#35936, max#36166, count#36167L])
+                                             :                 +- *(1) Sort [day_of_week_num#35938 ASC NULLS FIRST, local_hour#35936 ASC NULLS FIRST], false, 0
+                                             :                    +- *(1) Project [hour(from_utc_timestamp(pickup_ts#35961, America/New_York), Some(UTC)) AS local_hour#35936, date_format(cast(pickup_date#35965 as timestamp), EEEE, Some(UTC)) AS day_of_week#35937, dayofweek(pickup_date#35965) AS day_of_week_num#35938]
+                                             :                       +- *(1) Filter isnotnull(dayofweek(pickup_date#35965))
+                                             :                          +- *(1) ColumnarToRow
+                                             :                             +- FileScan parquet [pickup_ts#35961,pickup_date#35965,pickup_year_month#35966] Batched: true, DataFilters: [isnotnull(dayofweek(pickup_date#35965))], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<pickup_ts:timestamp,pickup_date:date>
+                                             +- BroadcastQueryStage 3
+                                                +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=20832]
+                                                   +- *(4) HashAggregate(keys=[day_of_week_num#35875], functions=[count(distinct pickup_date#125)], output=[day_of_week_num#35875, occurrences#35812L])
+                                                      +- AQEShuffleRead coalesced
+                                                         +- ShuffleQueryStage 2
+                                                            +- Exchange hashpartitioning(day_of_week_num#35875, 8), ENSURE_REQUIREMENTS, [plan_id=20740]
+                                                               +- *(3) HashAggregate(keys=[day_of_week_num#35875], functions=[partial_count(distinct pickup_date#125)], output=[day_of_week_num#35875, count#36170L])
+                                                                  +- *(3) HashAggregate(keys=[day_of_week_num#35875, pickup_date#125], functions=[], output=[day_of_week_num#35875, pickup_date#125])
+                                                                     +- AQEShuffleRead coalesced
+                                                                        +- ShuffleQueryStage 1
+                                                                           +- Exchange hashpartitioning(day_of_week_num#35875, pickup_date#125, 8), ENSURE_REQUIREMENTS, [plan_id=20631]
+                                                                              +- *(2) HashAggregate(keys=[day_of_week_num#35875, pickup_date#125], functions=[], output=[day_of_week_num#35875, pickup_date#125])
+                                                                                 +- *(2) Project [pickup_date#125, dayofweek(pickup_date#125) AS day_of_week_num#35875]
+                                                                                    +- *(2) Filter isnotnull(dayofweek(pickup_date#125))
+                                                                                       +- *(2) ColumnarToRow
+                                                                                          +- FileScan parquet [pickup_date#125,pickup_year_month#126] Batched: true, DataFilters: [isnotnull(dayofweek(pickup_date#125))], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<pickup_date:date>
++- == Initial Plan ==
+   Project [day_of_week#35813, local_hour#35936, avg_trips_per_occurrence#35815, total_trips#35814L, rank_in_day#35816, pct_of_day_total#35817]
+   +- Sort [day_of_week_num#35938 ASC NULLS FIRST, rank_in_day#35816 ASC NULLS FIRST], true, 0
+      +- Exchange rangepartitioning(day_of_week_num#35938 ASC NULLS FIRST, rank_in_day#35816 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=20536]
+         +- Project [day_of_week#35813, local_hour#35936, avg_trips_per_occurrence#35815, total_trips#35814L, rank_in_day#35816, round(((100.0 * cast(total_trips#35814L as decimal(20,0))) / cast(_we1#36003L as decimal(20,0))), 2) AS pct_of_day_total#35817, day_of_week_num#35938]
+            +- Filter (rank_in_day#35816 <= 3)
+               +- Window [sum(total_trips#35814L) windowspecdefinition(day_of_week_num#35938, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we1#36003L], [day_of_week_num#35938]
+                  +- Window [rank(total_trips#35814L) windowspecdefinition(day_of_week_num#35938, total_trips#35814L DESC NULLS LAST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rank_in_day#35816], [day_of_week_num#35938], [total_trips#35814L DESC NULLS LAST]
+                     +- Sort [day_of_week_num#35938 ASC NULLS FIRST, total_trips#35814L DESC NULLS LAST], false, 0
+                        +- Exchange hashpartitioning(day_of_week_num#35938, 8), ENSURE_REQUIREMENTS, [plan_id=20529]
+                           +- Project [day_of_week_num#35938, day_of_week#35813, local_hour#35936, total_trips#35814L, round((cast(total_trips#35814L as double) / cast(occurrences#35812L as double)), 1) AS avg_trips_per_occurrence#35815]
+                              +- BroadcastHashJoin [day_of_week_num#35938], [day_of_week_num#35875], Inner, BuildRight, false
+                                 :- SortAggregate(key=[day_of_week_num#35938, local_hour#35936], functions=[max(day_of_week#35937), count(1)], output=[day_of_week_num#35938, day_of_week#35813, local_hour#35936, total_trips#35814L])
+                                 :  +- Sort [day_of_week_num#35938 ASC NULLS FIRST, local_hour#35936 ASC NULLS FIRST], false, 0
+                                 :     +- Exchange hashpartitioning(day_of_week_num#35938, local_hour#35936, 8), ENSURE_REQUIREMENTS, [plan_id=20515]
+                                 :        +- SortAggregate(key=[day_of_week_num#35938, local_hour#35936], functions=[partial_max(day_of_week#35937), partial_count(1)], output=[day_of_week_num#35938, local_hour#35936, max#36166, count#36167L])
+                                 :           +- Sort [day_of_week_num#35938 ASC NULLS FIRST, local_hour#35936 ASC NULLS FIRST], false, 0
+                                 :              +- Project [hour(from_utc_timestamp(pickup_ts#35961, America/New_York), Some(UTC)) AS local_hour#35936, date_format(cast(pickup_date#35965 as timestamp), EEEE, Some(UTC)) AS day_of_week#35937, dayofweek(pickup_date#35965) AS day_of_week_num#35938]
+                                 :                 +- Filter isnotnull(dayofweek(pickup_date#35965))
+                                 :                    +- FileScan parquet [pickup_ts#35961,pickup_date#35965,pickup_year_month#35966] Batched: true, DataFilters: [isnotnull(dayofweek(pickup_date#35965))], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<pickup_ts:timestamp,pickup_date:date>
+                                 +- BroadcastExchange HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=20525]
+                                    +- HashAggregate(keys=[day_of_week_num#35875], functions=[count(distinct pickup_date#125)], output=[day_of_week_num#35875, occurrences#35812L])
+                                       +- Exchange hashpartitioning(day_of_week_num#35875, 8), ENSURE_REQUIREMENTS, [plan_id=20522]
+                                          +- HashAggregate(keys=[day_of_week_num#35875], functions=[partial_count(distinct pickup_date#125)], output=[day_of_week_num#35875, count#36170L])
+                                             +- HashAggregate(keys=[day_of_week_num#35875, pickup_date#125], functions=[], output=[day_of_week_num#35875, pickup_date#125])
+                                                +- Exchange hashpartitioning(day_of_week_num#35875, pickup_date#125, 8), ENSURE_REQUIREMENTS, [plan_id=20518]
+                                                   +- HashAggregate(keys=[day_of_week_num#35875, pickup_date#125], functions=[], output=[day_of_week_num#35875, pickup_date#125])
+                                                      +- Project [pickup_date#125, dayofweek(pickup_date#125) AS day_of_week_num#35875]
+                                                         +- Filter isnotnull(dayofweek(pickup_date#125))
+                                                            +- FileScan parquet [pickup_date#125,pickup_year_month#126] Batched: true, DataFilters: [isnotnull(dayofweek(pickup_date#125))], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<pickup_date:date>
+

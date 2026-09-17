@@ -11,6 +11,8 @@ python jobs/run_ingest.py                      # 1. ingest all four datasets
 python jobs/run_ingest.py weather taxi_zones   #    or just these
 python jobs/run_integrate.py                   # 2. join them into gold/integrated_taxi_trips
 python jobs/run_benchmark.py                   # 3. compare the two storage strategies
+python jobs/run_queries.py                     # 4. run the analytical queries (Week 2)
+python jobs/run_query_benchmark.py             # 5. run the optimisation experiments (Week 2)
 ```
 
 Ingestion reads `data/raw/`, writes Delta tables to `data/lakehouse/silver/`, and appends one row
@@ -36,6 +38,57 @@ a coverage row to `_meta/integration_metadata`. Config is
 
 On Windows, Spark prints `ERROR ShutdownHookManager: Exception while deleting Spark temp dir` when
 it exits. The run has already finished at that point, so ignore it.
+
+## Analytical queries (Week 2)
+
+Twelve named queries covering the six analyses the Week 2 assignment asks for. They run as Spark SQL
+against `gold/integrated_taxi_trips` and, for the join experiments, the silver tables behind it.
+
+```bash
+python jobs/run_queries.py --list                        # what is available
+python jobs/run_queries.py                               # run all twelve
+python jobs/run_queries.py q4_weather_sensitive_zones    # or just one
+python jobs/run_queries.py --explain q2_weather_distance_silver
+```
+
+The query design (grain, filters, normalisation, and the measurements behind each threshold) is in
+`docs/analytical_queries.md`. Bucket edges, the weather-code families and the support thresholds are
+configuration, in `conf/analytics.yaml`; the SQL hard-codes none of them.
+
+The timings `run_queries.py` prints are a single cold run with no warm-up and no repeats. They are
+there to show the queries work, not to be quoted: the benchmark harness is what produces measurements.
+
+Check the results are right, not just fast:
+
+```bash
+python scripts/verify_analytics.py
+```
+
+It asserts the invariants that would catch a filter silently dropping valid rows, a timezone
+conversion that never happened, or the two implementations of Q2 drifting apart. Exits non-zero on
+failure.
+
+## Optimisation experiments (Week 2)
+
+```bash
+python jobs/run_query_benchmark.py                 # the seven experiments
+python jobs/run_query_benchmark.py --sweep         # plus AQE on/off across every query
+python jobs/run_query_benchmark.py --only caching --repeats 5
+```
+
+Each experiment is a pair of variants that differ in exactly one thing (a predicate that can prune, a
+join hint, a cached intermediate, a session setting) and that must return the same answer. The
+harness times both with interleaved repeats after a discarded warm-up, takes the median, verifies the
+two result sets agree, and captures both physical plans.
+
+Exit codes: 1 means the run crashed, 2 means an optimisation changed the answer.
+
+Output goes to `reports/query_benchmark/`: `measurements.md` with the timings and plan features, and
+`plans/<experiment>.<side>.txt` with the plans. Two plans are captured per variant, because
+`EXPLAIN FORMATTED` reports the plan *before* execution: under AQE that is `isFinalPlan=false` and
+shows none of AQE's rewrites, so the executed plan is captured afterwards as `.final.txt`.
+
+The analysis is in `docs/optimisation.md`.
 
 Reading the result:
 
@@ -120,4 +173,7 @@ prints a fix for the first thing that fails.
 | `jobs/run_integrate.py` | joins the silver tables into `gold/integrated_taxi_trips` | yes |
 | `scripts/check_env.py` | verifies the whole stack end to end | yes |
 | `jobs/run_benchmark.py` | rewrites the fact table two ways and measures both | yes |
+| `jobs/run_queries.py` | runs the Week 2 analytical query library | yes |
+| `jobs/run_query_benchmark.py` | runs the optimisation experiments, writes the measurements | yes |
+| `scripts/verify_analytics.py` | checks the analytical layer's correctness invariants | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |

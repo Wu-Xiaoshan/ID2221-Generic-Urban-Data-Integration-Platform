@@ -1,0 +1,29 @@
+# partition_pruning_vs_full_scan / equality on pickup_year_month
+
+AdaptiveSparkPlan isFinalPlan=true
++- == Final Plan ==
+   *(3) Sort [trip_count#3669L DESC NULLS LAST], true, 0
+   +- AQEShuffleRead coalesced
+      +- ShuffleQueryStage 1
+         +- Exchange rangepartitioning(trip_count#3669L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=2197]
+            +- SortAggregate(key=[pickup_year_month#126, pu_location_id#105], functions=[max(pickup_zone#148), max(pickup_borough#147), count(1)], output=[pickup_year_month#126, pu_location_id#105, pickup_zone#3667, pickup_borough#3668, trip_count#3669L])
+               +- *(2) Sort [pickup_year_month#126 ASC NULLS FIRST, pu_location_id#105 ASC NULLS FIRST], false, 0
+                  +- AQEShuffleRead coalesced
+                     +- ShuffleQueryStage 0
+                        +- Exchange hashpartitioning(pickup_year_month#126, pu_location_id#105, 8), ENSURE_REQUIREMENTS, [plan_id=2160]
+                           +- SortAggregate(key=[pickup_year_month#126, pu_location_id#105], functions=[partial_max(pickup_zone#148), partial_max(pickup_borough#147), partial_count(1)], output=[pickup_year_month#126, pu_location_id#105, max#3823, max#3824, count#3825L])
+                              +- *(1) Sort [pickup_year_month#126 ASC NULLS FIRST, pu_location_id#105 ASC NULLS FIRST], false, 0
+                                 +- *(1) Filter NOT pu_location_id#105 IN (264,265)
+                                    +- *(1) ColumnarToRow
+                                       +- FileScan parquet [pu_location_id#105,pickup_borough#147,pickup_zone#148,pickup_year_month#126] Batched: true, DataFilters: [NOT pu_location_id#105 IN (264,265)], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [isnotnull(pickup_year_month#126), (pickup_year_month#126 = 2024-02)], PushedFilters: [Not(In(pu_location_id, [264,265]))], ReadSchema: struct<pu_location_id:int,pickup_borough:string,pickup_zone:string>
++- == Initial Plan ==
+   Sort [trip_count#3669L DESC NULLS LAST], true, 0
+   +- Exchange rangepartitioning(trip_count#3669L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=2132]
+      +- SortAggregate(key=[pickup_year_month#126, pu_location_id#105], functions=[max(pickup_zone#148), max(pickup_borough#147), count(1)], output=[pickup_year_month#126, pu_location_id#105, pickup_zone#3667, pickup_borough#3668, trip_count#3669L])
+         +- Sort [pickup_year_month#126 ASC NULLS FIRST, pu_location_id#105 ASC NULLS FIRST], false, 0
+            +- Exchange hashpartitioning(pickup_year_month#126, pu_location_id#105, 8), ENSURE_REQUIREMENTS, [plan_id=2128]
+               +- SortAggregate(key=[pickup_year_month#126, pu_location_id#105], functions=[partial_max(pickup_zone#148), partial_max(pickup_borough#147), partial_count(1)], output=[pickup_year_month#126, pu_location_id#105, max#3823, max#3824, count#3825L])
+                  +- Sort [pickup_year_month#126 ASC NULLS FIRST, pu_location_id#105 ASC NULLS FIRST], false, 0
+                     +- Filter NOT pu_location_id#105 IN (264,265)
+                        +- FileScan parquet [pu_location_id#105,pickup_borough#147,pickup_zone#148,pickup_year_month#126] Batched: true, DataFilters: [NOT pu_location_id#105 IN (264,265)], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [isnotnull(pickup_year_month#126), (pickup_year_month#126 = 2024-02)], PushedFilters: [Not(In(pu_location_id, [264,265]))], ReadSchema: struct<pu_location_id:int,pickup_borough:string,pickup_zone:string>
+

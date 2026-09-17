@@ -1,0 +1,91 @@
+# caching / uncached, three consumers
+
+== Physical Plan ==
+AdaptiveSparkPlan (14)
++- Sort (13)
+   +- Exchange (12)
+      +- HashAggregate (11)
+         +- Exchange (10)
+            +- HashAggregate (9)
+               +- SortAggregate (8)
+                  +- Sort (7)
+                     +- Exchange (6)
+                        +- SortAggregate (5)
+                           +- Sort (4)
+                              +- Project (3)
+                                 +- Filter (2)
+                                    +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [4]: [pickup_hour#106, aq_pm25_ugm3#142, air_quality_is_missing#146, pickup_year_month#126]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))]
+ReadSchema: struct<pickup_hour:timestamp,aq_pm25_ugm3:double,air_quality_is_missing:boolean>
+
+(2) Filter
+Input [4]: [pickup_hour#106, aq_pm25_ugm3#142, air_quality_is_missing#146, pickup_year_month#126]
+Condition : (isnotnull(air_quality_is_missing#146) AND NOT air_quality_is_missing#146)
+
+(3) Project
+Output [2]: [pickup_hour#106, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#142 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#142 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#142 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19190]
+Input [4]: [pickup_hour#106, aq_pm25_ugm3#142, air_quality_is_missing#146, pickup_year_month#126]
+
+(4) Sort
+Input [2]: [pickup_hour#106, aq_epa_category#19190]
+Arguments: [pickup_hour#106 ASC NULLS FIRST], false, 0
+
+(5) SortAggregate
+Input [2]: [pickup_hour#106, aq_epa_category#19190]
+Keys [1]: [pickup_hour#106]
+Functions [2]: [partial_count(1), partial_max(aq_epa_category#19190)]
+Aggregate Attributes [2]: [count#19285L, max#19286]
+Results [3]: [pickup_hour#106, count#19287L, max#19288]
+
+(6) Exchange
+Input [3]: [pickup_hour#106, count#19287L, max#19288]
+Arguments: hashpartitioning(pickup_hour#106, 8), ENSURE_REQUIREMENTS, [plan_id=10479]
+
+(7) Sort
+Input [3]: [pickup_hour#106, count#19287L, max#19288]
+Arguments: [pickup_hour#106 ASC NULLS FIRST], false, 0
+
+(8) SortAggregate
+Input [3]: [pickup_hour#106, count#19287L, max#19288]
+Keys [1]: [pickup_hour#106]
+Functions [2]: [count(1), max(aq_epa_category#19190)]
+Aggregate Attributes [2]: [count(1)#19191L, max(aq_epa_category#19190)#19197]
+Results [2]: [count(1)#19191L AS trip_count#19120L, max(aq_epa_category#19190)#19197 AS aq_epa_category#19126]
+
+(9) HashAggregate
+Input [2]: [trip_count#19120L, aq_epa_category#19126]
+Keys [1]: [aq_epa_category#19126]
+Functions [2]: [partial_count(1), partial_avg(trip_count#19120L)]
+Aggregate Attributes [3]: [count#19279L, sum#19280, count#19281L]
+Results [4]: [aq_epa_category#19126, count#19282L, sum#19283, count#19284L]
+
+(10) Exchange
+Input [4]: [aq_epa_category#19126, count#19282L, sum#19283, count#19284L]
+Arguments: hashpartitioning(aq_epa_category#19126, 8), ENSURE_REQUIREMENTS, [plan_id=10484]
+
+(11) HashAggregate
+Input [4]: [aq_epa_category#19126, count#19282L, sum#19283, count#19284L]
+Keys [1]: [aq_epa_category#19126]
+Functions [2]: [count(1), avg(trip_count#19120L)]
+Aggregate Attributes [2]: [count(1)#19200L, avg(trip_count#19120L)#19201]
+Results [3]: [aq_epa_category#19126, count(1)#19200L AS hours#19104L, round(avg(trip_count#19120L)#19201, 1) AS avg_trips_per_hour#19105]
+
+(12) Exchange
+Input [3]: [aq_epa_category#19126, hours#19104L, avg_trips_per_hour#19105]
+Arguments: rangepartitioning(hours#19104L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=10487]
+
+(13) Sort
+Input [3]: [aq_epa_category#19126, hours#19104L, avg_trips_per_hour#19105]
+Arguments: [hours#19104L DESC NULLS LAST], true, 0
+
+(14) AdaptiveSparkPlan
+Output [3]: [aq_epa_category#19126, hours#19104L, avg_trips_per_hour#19105]
+Arguments: isFinalPlan=false
+
+

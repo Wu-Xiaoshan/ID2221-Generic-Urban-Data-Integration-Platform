@@ -1,0 +1,39 @@
+# caching / uncached, three consumers
+
+AdaptiveSparkPlan isFinalPlan=true
++- == Final Plan ==
+   *(5) Sort [hours#19289L DESC NULLS LAST], true, 0
+   +- AQEShuffleRead coalesced
+      +- ShuffleQueryStage 2
+         +- Exchange rangepartitioning(hours#19289L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=10672]
+            +- *(4) HashAggregate(keys=[aq_epa_category#19306], functions=[count(1), avg(trip_count#19300L)], output=[aq_epa_category#19306, hours#19289L, avg_trips_per_hour#19290])
+               +- AQEShuffleRead coalesced
+                  +- ShuffleQueryStage 1
+                     +- Exchange hashpartitioning(aq_epa_category#19306, 8), ENSURE_REQUIREMENTS, [plan_id=10638]
+                        +- *(3) HashAggregate(keys=[aq_epa_category#19306], functions=[partial_count(1), partial_avg(trip_count#19300L)], output=[aq_epa_category#19306, count#19465L, sum#19466, count#19467L])
+                           +- SortAggregate(key=[pickup_hour#106], functions=[count(1), max(aq_epa_category#19370)], output=[trip_count#19300L, aq_epa_category#19306])
+                              +- *(2) Sort [pickup_hour#106 ASC NULLS FIRST], false, 0
+                                 +- AQEShuffleRead coalesced
+                                    +- ShuffleQueryStage 0
+                                       +- Exchange hashpartitioning(pickup_hour#106, 8), ENSURE_REQUIREMENTS, [plan_id=10578]
+                                          +- SortAggregate(key=[pickup_hour#106], functions=[partial_count(1), partial_max(aq_epa_category#19370)], output=[pickup_hour#106, count#19470L, max#19471])
+                                             +- *(1) Sort [pickup_hour#106 ASC NULLS FIRST], false, 0
+                                                +- *(1) Project [pickup_hour#106, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#142 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#142 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#142 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19370]
+                                                   +- *(1) Filter (isnotnull(air_quality_is_missing#146) AND NOT air_quality_is_missing#146)
+                                                      +- *(1) ColumnarToRow
+                                                         +- FileScan parquet [pickup_hour#106,aq_pm25_ugm3#142,air_quality_is_missing#146,pickup_year_month#126] Batched: true, DataFilters: [isnotnull(air_quality_is_missing#146), NOT air_quality_is_missing#146], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [], PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))], ReadSchema: struct<pickup_hour:timestamp,aq_pm25_ugm3:double,air_quality_is_missing:boolean>
++- == Initial Plan ==
+   Sort [hours#19289L DESC NULLS LAST], true, 0
+   +- Exchange rangepartitioning(hours#19289L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=10540]
+      +- HashAggregate(keys=[aq_epa_category#19306], functions=[count(1), avg(trip_count#19300L)], output=[aq_epa_category#19306, hours#19289L, avg_trips_per_hour#19290])
+         +- Exchange hashpartitioning(aq_epa_category#19306, 8), ENSURE_REQUIREMENTS, [plan_id=10537]
+            +- HashAggregate(keys=[aq_epa_category#19306], functions=[partial_count(1), partial_avg(trip_count#19300L)], output=[aq_epa_category#19306, count#19465L, sum#19466, count#19467L])
+               +- SortAggregate(key=[pickup_hour#106], functions=[count(1), max(aq_epa_category#19370)], output=[trip_count#19300L, aq_epa_category#19306])
+                  +- Sort [pickup_hour#106 ASC NULLS FIRST], false, 0
+                     +- Exchange hashpartitioning(pickup_hour#106, 8), ENSURE_REQUIREMENTS, [plan_id=10532]
+                        +- SortAggregate(key=[pickup_hour#106], functions=[partial_count(1), partial_max(aq_epa_category#19370)], output=[pickup_hour#106, count#19470L, max#19471])
+                           +- Sort [pickup_hour#106 ASC NULLS FIRST], false, 0
+                              +- Project [pickup_hour#106, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#142 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#142 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#142 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19370]
+                                 +- Filter (isnotnull(air_quality_is_missing#146) AND NOT air_quality_is_missing#146)
+                                    +- FileScan parquet [pickup_hour#106,aq_pm25_ugm3#142,air_quality_is_missing#146,pickup_year_month#126] Batched: true, DataFilters: [isnotnull(air_quality_is_missing#146), NOT air_quality_is_missing#146], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [], PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))], ReadSchema: struct<pickup_hour:timestamp,aq_pm25_ugm3:double,air_quality_is_missing:boolean>
+

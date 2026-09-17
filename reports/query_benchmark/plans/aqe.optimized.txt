@@ -1,0 +1,142 @@
+# aqe / AQE enabled
+
+== Physical Plan ==
+AdaptiveSparkPlan (23)
++- Sort (22)
+   +- Exchange (21)
+      +- Project (20)
+         +- Filter (19)
+            +- SortAggregate (18)
+               +- Sort (17)
+                  +- Exchange (16)
+                     +- SortAggregate (15)
+                        +- Project (14)
+                           +- Filter (13)
+                              +- SortAggregate (12)
+                                 +- Sort (11)
+                                    +- Exchange (10)
+                                       +- SortAggregate (9)
+                                          +- SortAggregate (8)
+                                             +- Sort (7)
+                                                +- Exchange (6)
+                                                   +- SortAggregate (5)
+                                                      +- Sort (4)
+                                                         +- Project (3)
+                                                            +- Filter (2)
+                                                               +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [7]: [pu_location_id#105, pickup_hour#106, weather_condition_code#139, weather_is_missing#141, pickup_borough#147, pickup_zone#148, pickup_year_month#126]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [IsNotNull(weather_is_missing), Not(In(pu_location_id, [264,265])), Not(EqualTo(weather_is_missing,true))]
+ReadSchema: struct<pu_location_id:int,pickup_hour:timestamp,weather_condition_code:int,weather_is_missing:boolean,pickup_borough:string,pickup_zone:string>
+
+(2) Filter
+Input [7]: [pu_location_id#105, pickup_hour#106, weather_condition_code#139, weather_is_missing#141, pickup_borough#147, pickup_zone#148, pickup_year_month#126]
+Condition : (((isnotnull(weather_is_missing#141) AND NOT pu_location_id#105 IN (264,265)) AND NOT weather_is_missing#141) AND CASE WHEN isnull(weather_condition_code#139) THEN false WHEN weather_condition_code#139 IN (1,2) THEN true WHEN weather_condition_code#139 IN (3,4) THEN true WHEN weather_condition_code#139 IN (5,6) THEN true WHEN weather_condition_code#139 IN (7,8,9,17,18) THEN true WHEN weather_condition_code#139 INSET 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 24 THEN true WHEN weather_condition_code#139 IN (23,25,26,27) THEN true ELSE false END)
+
+(3) Project
+Output [5]: [pu_location_id#105, pickup_hour#106, pickup_borough#147, pickup_zone#148, CASE WHEN isnull(weather_condition_code#139) THEN null WHEN weather_condition_code#139 IN (1,2) THEN Clear WHEN weather_condition_code#139 IN (3,4) THEN Cloudy WHEN weather_condition_code#139 IN (5,6) THEN Fog WHEN weather_condition_code#139 IN (7,8,9,17,18) THEN Rain WHEN weather_condition_code#139 INSET 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 24 THEN Snow/Ice WHEN weather_condition_code#139 IN (23,25,26,27) THEN Storm END AS weather_family#31188]
+Input [7]: [pu_location_id#105, pickup_hour#106, weather_condition_code#139, weather_is_missing#141, pickup_borough#147, pickup_zone#148, pickup_year_month#126]
+
+(4) Sort
+Input [5]: [pu_location_id#105, pickup_hour#106, pickup_borough#147, pickup_zone#148, weather_family#31188]
+Arguments: [pu_location_id#105 ASC NULLS FIRST, weather_family#31188 ASC NULLS FIRST, pickup_hour#106 ASC NULLS FIRST], false, 0
+
+(5) SortAggregate
+Input [5]: [pu_location_id#105, pickup_hour#106, pickup_borough#147, pickup_zone#148, weather_family#31188]
+Keys [3]: [pu_location_id#105, weather_family#31188, pickup_hour#106]
+Functions [3]: [partial_max(pickup_zone#148), partial_max(pickup_borough#147), partial_count(1)]
+Aggregate Attributes [3]: [max(pickup_zone#148)#31192, max(pickup_borough#147)#31193, count(1)#31194L]
+Results [6]: [pu_location_id#105, weather_family#31188, pickup_hour#106, max#31324, max#31326, count#31328L]
+
+(6) Exchange
+Input [6]: [pu_location_id#105, weather_family#31188, pickup_hour#106, max#31324, max#31326, count#31328L]
+Arguments: hashpartitioning(pu_location_id#105, weather_family#31188, pickup_hour#106, 8), ENSURE_REQUIREMENTS, [plan_id=15993]
+
+(7) Sort
+Input [6]: [pu_location_id#105, weather_family#31188, pickup_hour#106, max#31324, max#31326, count#31328L]
+Arguments: [pu_location_id#105 ASC NULLS FIRST, weather_family#31188 ASC NULLS FIRST, pickup_hour#106 ASC NULLS FIRST], false, 0
+
+(8) SortAggregate
+Input [6]: [pu_location_id#105, weather_family#31188, pickup_hour#106, max#31324, max#31326, count#31328L]
+Keys [3]: [pu_location_id#105, weather_family#31188, pickup_hour#106]
+Functions [3]: [merge_max(pickup_zone#148), merge_max(pickup_borough#147), merge_count(1)]
+Aggregate Attributes [3]: [max(pickup_zone#148)#31192, max(pickup_borough#147)#31193, count(1)#31194L]
+Results [6]: [pu_location_id#105, weather_family#31188, pickup_hour#106, max#31324, max#31326, count#31328L]
+
+(9) SortAggregate
+Input [6]: [pu_location_id#105, weather_family#31188, pickup_hour#106, max#31324, max#31326, count#31328L]
+Keys [2]: [pu_location_id#105, weather_family#31188]
+Functions [4]: [merge_max(pickup_zone#148), merge_max(pickup_borough#147), merge_count(1), partial_count(distinct pickup_hour#106)]
+Aggregate Attributes [4]: [max(pickup_zone#148)#31192, max(pickup_borough#147)#31193, count(1)#31194L, count(pickup_hour#106)#31195L]
+Results [6]: [pu_location_id#105, weather_family#31188, max#31324, max#31326, count#31328L, count#31331L]
+
+(10) Exchange
+Input [6]: [pu_location_id#105, weather_family#31188, max#31324, max#31326, count#31328L, count#31331L]
+Arguments: hashpartitioning(pu_location_id#105, weather_family#31188, 8), ENSURE_REQUIREMENTS, [plan_id=15998]
+
+(11) Sort
+Input [6]: [pu_location_id#105, weather_family#31188, max#31324, max#31326, count#31328L, count#31331L]
+Arguments: [pu_location_id#105 ASC NULLS FIRST, weather_family#31188 ASC NULLS FIRST], false, 0
+
+(12) SortAggregate
+Input [6]: [pu_location_id#105, weather_family#31188, max#31324, max#31326, count#31328L, count#31331L]
+Keys [2]: [pu_location_id#105, weather_family#31188]
+Functions [4]: [max(pickup_zone#148), max(pickup_borough#147), count(1), count(distinct pickup_hour#106)]
+Aggregate Attributes [4]: [max(pickup_zone#148)#31192, max(pickup_borough#147)#31193, count(1)#31194L, count(pickup_hour#106)#31195L]
+Results [6]: [pu_location_id#105, weather_family#31188, max(pickup_zone#148)#31192 AS pickup_zone#31109, max(pickup_borough#147)#31193 AS pickup_borough#31110, count(1)#31194L AS trips#31111L, count(pickup_hour#106)#31195L AS hours#31112L]
+
+(13) Filter
+Input [6]: [pu_location_id#105, weather_family#31188, pickup_zone#31109, pickup_borough#31110, trips#31111L, hours#31112L]
+Condition : (hours#31112L >= 24)
+
+(14) Project
+Output [6]: [pu_location_id#105, weather_family#31188, pickup_zone#31109, pickup_borough#31110, trips#31111L, (cast(trips#31111L as double) / cast(hours#31112L as double)) AS trips_per_hour#31113]
+Input [6]: [pu_location_id#105, weather_family#31188, pickup_zone#31109, pickup_borough#31110, trips#31111L, hours#31112L]
+
+(15) SortAggregate
+Input [6]: [pu_location_id#105, weather_family#31188, pickup_zone#31109, pickup_borough#31110, trips#31111L, trips_per_hour#31113]
+Keys [1]: [pu_location_id#105]
+Functions [10]: [partial_max(pickup_zone#31109), partial_max(pickup_borough#31110), partial_count(1), partial_sum(trips#31111L), partial_avg(trips_per_hour#31113), partial_stddev_samp(trips_per_hour#31113), partial_max_by(weather_family#31188, trips_per_hour#31113), partial_min_by(weather_family#31188, trips_per_hour#31113), partial_max(trips_per_hour#31113), partial_min(trips_per_hour#31113)]
+Aggregate Attributes [15]: [max#31299, max#31300, count#31301L, sum#31302L, sum#31303, count#31304L, n#31201, avg#31202, m2#31203, valueWithExtremumOrdering#31305, extremumOrdering#31306, valueWithExtremumOrdering#31307, extremumOrdering#31308, max#31309, min#31310]
+Results [16]: [pu_location_id#105, max#31311, max#31312, count#31313L, sum#31314L, sum#31315, count#31316L, n#31206, avg#31207, m2#31208, valueWithExtremumOrdering#31317, extremumOrdering#31318, valueWithExtremumOrdering#31319, extremumOrdering#31320, max#31321, min#31322]
+
+(16) Exchange
+Input [16]: [pu_location_id#105, max#31311, max#31312, count#31313L, sum#31314L, sum#31315, count#31316L, n#31206, avg#31207, m2#31208, valueWithExtremumOrdering#31317, extremumOrdering#31318, valueWithExtremumOrdering#31319, extremumOrdering#31320, max#31321, min#31322]
+Arguments: hashpartitioning(pu_location_id#105, 8), ENSURE_REQUIREMENTS, [plan_id=16005]
+
+(17) Sort
+Input [16]: [pu_location_id#105, max#31311, max#31312, count#31313L, sum#31314L, sum#31315, count#31316L, n#31206, avg#31207, m2#31208, valueWithExtremumOrdering#31317, extremumOrdering#31318, valueWithExtremumOrdering#31319, extremumOrdering#31320, max#31321, min#31322]
+Arguments: [pu_location_id#105 ASC NULLS FIRST], false, 0
+
+(18) SortAggregate
+Input [16]: [pu_location_id#105, max#31311, max#31312, count#31313L, sum#31314L, sum#31315, count#31316L, n#31206, avg#31207, m2#31208, valueWithExtremumOrdering#31317, extremumOrdering#31318, valueWithExtremumOrdering#31319, extremumOrdering#31320, max#31321, min#31322]
+Keys [1]: [pu_location_id#105]
+Functions [10]: [max(pickup_zone#31109), max(pickup_borough#31110), count(1), sum(trips#31111L), avg(trips_per_hour#31113), stddev_samp(trips_per_hour#31113), max_by(weather_family#31188, trips_per_hour#31113), min_by(weather_family#31188, trips_per_hour#31113), max(trips_per_hour#31113), min(trips_per_hour#31113)]
+Aggregate Attributes [10]: [max(pickup_zone#31109)#31197, max(pickup_borough#31110)#31198, count(1)#31196L, sum(trips#31111L)#31199L, avg(trips_per_hour#31113)#31200, stddev_samp(trips_per_hour#31113)#31209, max_by(weather_family#31188, trips_per_hour#31113)#31210, min_by(weather_family#31188, trips_per_hour#31113)#31211, max(trips_per_hour#31113)#31212, min(trips_per_hour#31113)#31213]
+Results [11]: [pu_location_id#105, max(pickup_zone#31109)#31197 AS pickup_zone#31114, max(pickup_borough#31110)#31198 AS pickup_borough#31115, count(1)#31196L AS families_observed#31116L, sum(trips#31111L)#31199L AS total_trips#31117L, avg(trips_per_hour#31113)#31200 AS mean_tph#31118, stddev_samp(trips_per_hour#31113)#31209 AS sd_tph#31119, max_by(weather_family#31188, trips_per_hour#31113)#31210 AS busiest_family#31120, min_by(weather_family#31188, trips_per_hour#31113)#31211 AS quietest_family#31121, max(trips_per_hour#31113)#31212 AS max_tph#31122, min(trips_per_hour#31113)#31213 AS min_tph#31123]
+
+(19) Filter
+Input [11]: [pu_location_id#105, pickup_zone#31114, pickup_borough#31115, families_observed#31116L, total_trips#31117L, mean_tph#31118, sd_tph#31119, busiest_family#31120, quietest_family#31121, max_tph#31122, min_tph#31123]
+Condition : ((isnotnull(total_trips#31117L) AND isnotnull(mean_tph#31118)) AND (((families_observed#31116L >= 4) AND (total_trips#31117L >= 10000)) AND (mean_tph#31118 > 0.0)))
+
+(20) Project
+Output [11]: [pu_location_id#105, pickup_zone#31114, pickup_borough#31115, families_observed#31116L, total_trips#31117L, round(mean_tph#31118, 2) AS mean_trips_per_hour#31105, round(sd_tph#31119, 2) AS stddev_trips_per_hour#31106, round((sd_tph#31119 / mean_tph#31118), 4) AS coef_of_variation#31107, busiest_family#31120, quietest_family#31121, round((max_tph#31122 / min_tph#31123), 2) AS max_min_ratio#31108]
+Input [11]: [pu_location_id#105, pickup_zone#31114, pickup_borough#31115, families_observed#31116L, total_trips#31117L, mean_tph#31118, sd_tph#31119, busiest_family#31120, quietest_family#31121, max_tph#31122, min_tph#31123]
+
+(21) Exchange
+Input [11]: [pu_location_id#105, pickup_zone#31114, pickup_borough#31115, families_observed#31116L, total_trips#31117L, mean_trips_per_hour#31105, stddev_trips_per_hour#31106, coef_of_variation#31107, busiest_family#31120, quietest_family#31121, max_min_ratio#31108]
+Arguments: rangepartitioning(coef_of_variation#31107 DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=16011]
+
+(22) Sort
+Input [11]: [pu_location_id#105, pickup_zone#31114, pickup_borough#31115, families_observed#31116L, total_trips#31117L, mean_trips_per_hour#31105, stddev_trips_per_hour#31106, coef_of_variation#31107, busiest_family#31120, quietest_family#31121, max_min_ratio#31108]
+Arguments: [coef_of_variation#31107 DESC NULLS LAST], true, 0
+
+(23) AdaptiveSparkPlan
+Output [11]: [pu_location_id#105, pickup_zone#31114, pickup_borough#31115, families_observed#31116L, total_trips#31117L, mean_trips_per_hour#31105, stddev_trips_per_hour#31106, coef_of_variation#31107, busiest_family#31120, quietest_family#31121, max_min_ratio#31108]
+Arguments: isFinalPlan=false
+
+
