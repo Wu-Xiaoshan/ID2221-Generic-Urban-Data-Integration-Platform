@@ -52,7 +52,7 @@ python jobs/run_queries.py --explain q2_weather_distance_silver
 ```
 
 The query design (grain, filters, normalisation, and the measurements behind each threshold) is in
-`docs/analytical_queries.md`. Bucket edges, the weather-code families and the support thresholds are
+`DesignReportWeek2.docx`. Bucket edges, the weather-code families and the support thresholds are
 configuration, in `conf/analytics.yaml`; the SQL hard-codes none of them.
 
 The timings `run_queries.py` prints are a single cold run with no warm-up and no repeats. They are
@@ -88,7 +88,7 @@ Output goes to `reports/query_benchmark/`: `measurements.md` with the timings an
 `EXPLAIN FORMATTED` reports the plan *before* execution: under AQE that is `isFinalPlan=false` and
 shows none of AQE's rewrites, so the executed plan is captured afterwards as `.final.txt`.
 
-The analysis is in `docs/optimisation.md`.
+The analysis is in `BenchmarkReportWeek2.docx`.
 
 Reading the result:
 

@@ -168,15 +168,24 @@ def build_queries(cfg: AnalyticsConfig) -> list[QueryDef]:
     ORDER BY hours DESC
     """
 
-    # Q4. Two normalisations carry this query.
+    # Q4. Two normalisations carry this query. The rate divides by the hours the family
+    # occurred city-wide, not by the hours the zone had a pickup: the latter leaves the
+    # zone's zero-trip hours out of the denominator and overstates its rate.
     q4 = f"""
-    WITH cell AS (
+    WITH family_hours AS (
+        SELECT weather_family,
+               COUNT(DISTINCT pickup_hour) AS hours
+        FROM trips
+        WHERE NOT weather_is_missing
+          AND weather_family IS NOT NULL
+        GROUP BY weather_family
+    ),
+    cell AS (
         SELECT pu_location_id,
                weather_family,
                MAX(pickup_zone)            AS pickup_zone,
                MAX(pickup_borough)         AS pickup_borough,
-               COUNT(*)                    AS trips,
-               COUNT(DISTINCT pickup_hour) AS hours
+               COUNT(*)                    AS trips
         FROM trips
         WHERE pu_location_id NOT IN ({sentinels})
           AND NOT weather_is_missing
@@ -184,9 +193,10 @@ def build_queries(cfg: AnalyticsConfig) -> list[QueryDef]:
         GROUP BY pu_location_id, weather_family
     ),
     rate AS (
-        SELECT *, trips / hours AS trips_per_hour
-        FROM cell
-        WHERE hours >= {min_hours_cell}
+        SELECT c.*, f.hours, c.trips / f.hours AS trips_per_hour
+        FROM cell c
+        JOIN family_hours f ON c.weather_family = f.weather_family
+        WHERE f.hours >= {min_hours_cell}
     ),
     zone AS (
         SELECT pu_location_id,

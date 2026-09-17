@@ -127,7 +127,7 @@ def build_experiments(cfg: AnalyticsConfig) -> list[Experiment]:
     aqe = Experiment(
         name="aqe",
         technique="Adaptive Query Execution",
-        question="Does AQE help the skewed two-level aggregation in Q4?",
+        question="Does AQE help Q4's shuffle-heavy aggregations?",
         baseline=Variant(
             "AQE disabled",
             [sql["q4_weather_sensitive_zones"]],
@@ -138,6 +138,8 @@ def build_experiments(cfg: AnalyticsConfig) -> list[Experiment]:
             [sql["q4_weather_sensitive_zones"]],
             conf={"spark.sql.adaptive.enabled": "true"},
         ),
+        notes="AQE's skew handling only splits partitions of shuffle joins, so Q4's skewed "
+              "aggregations cannot trigger it.",
     )
 
     # 5. Control
@@ -155,8 +157,8 @@ def build_experiments(cfg: AnalyticsConfig) -> list[Experiment]:
             [sql["q5_peak_hours"]],
             conf={"spark.sql.autoBroadcastJoinThreshold": BROADCAST_DEFAULT},
         ),
-        notes="The plan changes and the runtime does not. This row is the noise floor "
-              "for every other row in the table.",
+        notes="The plan changes and the runtime does not. Judge noise from the samples of "
+              "each row, not from this row alone.",
     )
 
     return [
