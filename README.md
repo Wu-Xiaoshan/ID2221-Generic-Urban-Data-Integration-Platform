@@ -33,17 +33,25 @@ the same input always produces the same result.
 
 `run_integrate.py` joins the four silver tables into `gold/integrated_taxi_trips`, one row per trip
 with the weather and air quality at the pickup hour and the zone and borough of both endpoints. It
-takes three to four minutes (also subject to the same run-to-run variance as ingestion) and appends
-a coverage row to `_meta/integration_metadata`. Config is
-`conf/integration.yaml`.
+takes three to four minutes, with some variation between runs, and appends a coverage row to
+`_meta/integration_metadata`. Its config is `conf/integration.yaml`.
+
+To read the integrated table:
+
+```python
+spark.read.format("delta").load("data/lakehouse/gold/integrated_taxi_trips")
+```
+
+The four silver tables under `data/lakehouse/silver/` load the same way.
 
 On Windows, Spark prints `ERROR ShutdownHookManager: Exception while deleting Spark temp dir` when
 it exits. The run has already finished at that point, so ignore it.
 
 ## Analytical queries (Week 2)
 
-Twelve named queries covering the six analyses the Week 2 assignment asks for. They run as Spark SQL
-against `gold/integrated_taxi_trips` and, for the join experiments, the silver tables behind it.
+Twelve named queries cover the six analyses the Week 2 assignment asks for. They run as Spark SQL
+against `gold/integrated_taxi_trips` and, for the join experiments, against the silver tables behind
+it.
 
 ```bash
 python jobs/run_queries.py --list                        # what is available
@@ -56,17 +64,17 @@ The query design (grain, filters, normalisation, and the measurements behind eac
 `DesignReportWeek2.docx`. Bucket edges, the weather-code families and the support thresholds are
 configuration, in `conf/analytics.yaml`; the SQL hard-codes none of them.
 
-The timings `run_queries.py` prints are a single cold run with no warm-up and no repeats. They are
-there to show the queries work, not to be quoted: the benchmark harness is what produces measurements.
+The timings `run_queries.py` prints come from a single cold run with no warm-up and no repeats. They
+show that the queries work; for measurements, use the benchmark harness below.
 
-Check the results are right, not just fast:
+To check that the results are correct:
 
 ```bash
 python scripts/verify_analytics.py
 ```
 
-It asserts the invariants that would catch a filter silently dropping valid rows, a timezone
-conversion that never happened, or the two implementations of Q2 drifting apart. Exits non-zero on
+Its invariants catch a filter that silently drops valid rows or a timezone conversion that never
+happened, and they confirm that the two implementations of Q2 still agree. It exits non-zero on
 failure.
 
 ## Optimisation experiments (Week 2)
@@ -93,8 +101,8 @@ The analysis is in `BenchmarkReportWeek2.docx`.
 
 ## Analytical data products (Week 2)
 
-Four Delta tables materialised from `gold/integrated_taxi_trips`, for analysts who need the result of
-a report rather than the query behind it.
+Four Delta tables materialise common reports from `gold/integrated_taxi_trips`, so analysts can read
+the results without running the queries.
 
 ```bash
 python jobs/run_products.py --list                     # what is available
@@ -113,53 +121,56 @@ python scripts/verify_products.py                      # check them
 
 Products are written to `data/lakehouse/products/<name>`. Each one is a single Spark SQL statement in
 `src/urbanplatform/analytics/products.py` over the same views as the analytical queries, and
-`zone_monthly_statistics` embeds Q1 unchanged. Grain, schema version and layout are configuration,
-in `conf/products.yaml`.
+`zone_monthly_statistics` embeds Q1 unchanged. Each product's grain, schema version and partitioning
+are set in `conf/products.yaml`.
 
 Metadata is recorded in two places. Every product table carries `product.*` Delta table properties:
 its source table and the Delta version of that table it was built from, creation and refresh time
 (UTC), schema version and a fingerprint of its columns. `_meta/data_product_metadata` gets one row
-per product per run with the same fields, plus row count, file count, size and duration. Changing a
-product's columns without bumping its `schema_version` fails the run, rather than silently changing
-the table under its readers.
+per product per run with the same fields, plus row count, file count, size and duration. If a
+product's columns change and its `schema_version` does not, the run fails.
 
 ```python
 spark.sql("DESCRIBE DETAIL delta.`data/lakehouse/products/daily_mobility_summary`").select("properties").show(truncate=False)
 spark.read.format("delta").load("data/lakehouse/_meta/data_product_metadata").show()
 ```
 
-`verify_products.py` checks the grain, metadata and freshness of every product, and that each one
-agrees with its source: daily trips add up to the gold table, `zone_monthly_statistics` equals Q1, and
-Q4's ranking and Q3's correlations can be recomputed from `weather_impact_summary` and
-`hourly_air_quality_demand`. Exits non-zero on failure.
-
-Reading the result:
-
-```python
-spark.read.format("delta").load("data/lakehouse/gold/integrated_taxi_trips")
-```
-
-The four silver tables under `data/lakehouse/silver/` load the same way.
+`verify_products.py` checks each product's key, metadata and freshness, and compares it with its
+source. The daily trips must add up to the gold table, and `zone_monthly_statistics` must equal Q1.
+Q4's ranking and Q3's correlations must come out the same when recomputed from
+`weather_impact_summary` and `hourly_air_quality_demand`. It exits non-zero on failure.
 
 ## Project layout
 
 ```
-DesignReportWeek1.pdf         the design report
-ArchitectureDiagramWeek1.pdf  the architecture diagram
-BenchmarkReportWeek1.pdf      the benchmark report
+DesignReportWeek1.pdf         the Week 1 design report
+ArchitectureDiagramWeek1.pdf  the Week 1 architecture diagram
+BenchmarkReportWeek1.pdf      the Week 1 benchmark report
+DesignReportWeek2.docx        the Week 2 design report
+BenchmarkReportWeek2.docx     the Week 2 benchmark report
 README.md                     this file
 conf/
   platform.yaml               Spark settings and the lakehouse root
   datasets/*.yaml             one file per dataset: source, schema, renames, timestamps, quality rules
   integration.yaml            how the integration joins the four tables
-  products.yaml               the analytical data products: grain, schema version, layout
-src/urbanplatform/            the ingestion framework and the integration pipeline
+  analytics.yaml              bucket edges, weather families and thresholds for the analytical queries
+  products.yaml               the analytical data products: grain, schema version, partitioning
+src/urbanplatform/            the ingestion framework, the integration pipeline and the analytical layer
   ingest.py                   one pipeline that runs every dataset
   integrate.py                builds gold/integrated_taxi_trips
   transforms/                 the only dataset-specific code
-jobs/                         entry points: run_ingest.py, run_integrate.py, run_benchmark.py
-scripts/                      check_env.py and profile_raw.py
+  analytics/                  the Week 2 analytical layer
+    config.py                 loads conf/analytics.yaml and turns it into SQL CASE expressions
+    views.py                  the views that queries and products read: trips, hourly_demand
+    queries.py                the analytical query library
+    benchmark.py              the benchmark harness: timing, result comparison, plan capture
+    experiments.py            the optimisation experiments
+    products.py               what each data product computes
+    materialize.py            writes the data products and their metadata
+jobs/                         one entry point per step (see Scripts)
+scripts/                      the environment check, raw-file profiling and correctness checks (see Scripts)
 docs/common_data_model.md     the common data model, with every column transformation listed
+reports/query_benchmark/      written by run_query_benchmark.py: measurements.md and plans/
 data/raw/                     source files, not included (see Setup)
 data/lakehouse/               created by the jobs
   silver/                     one Delta table per dataset
@@ -187,7 +198,7 @@ pip install -r requirements.txt
 
 Set `JAVA_HOME` to the JDK root. For Anaconda that is `<anaconda>\Library\lib\jvm`.
 
-**On Windows**, also download `winutils.exe` and `hadoop.dll` for Hadoop 3.3.x from
+On Windows, also download `winutils.exe` and `hadoop.dll` for Hadoop 3.3.x from
 [cdarlint/winutils](https://github.com/cdarlint/winutils/tree/master/hadoop-3.3.6/bin) into
 `<dir>\bin`, then set `HADOOP_HOME=<dir>` and add `%HADOOP_HOME%\bin` to `PATH`. PySpark does not
 ship these and Spark will not start without them. Linux and macOS do not need this step.
@@ -201,7 +212,7 @@ data/raw/air_quality/hourly_88101_2024.csv
 data/raw/taxi_zones/taxi_zone_lookup.csv
 ```
 
-Finally, check everything works:
+Finally, check that everything works:
 
 ```bash
 python scripts/check_env.py
