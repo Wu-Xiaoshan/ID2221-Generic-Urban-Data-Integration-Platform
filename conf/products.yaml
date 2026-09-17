@@ -1,0 +1,47 @@
+# Analytical data products, materialised from the integrated dataset by jobs/run_products.py.
+# The SQL for each product is in src/urbanplatform/analytics/products.py, under the same name.
+
+source: {layer: gold, table: integrated_taxi_trips}
+layer: products
+
+# Speed is averaged only over trips whose own implied speed is plausible. Durations of a few
+# seconds turn ordinary distances into hundreds of mph, most visibly at Newark Airport (EWR).
+thresholds:
+  max_plausible_speed_mph: 80
+
+# schema_version is declared, not derived: bump it whenever a product's columns change.
+# The job refuses to overwrite a table whose columns changed under an unchanged version.
+products:
+  daily_mobility_summary:
+    description: Daily trips, distance, duration and revenue per pickup borough, with that day's weather and PM2.5.
+    grain: one row per New York local date and pickup borough
+    audience: operations and management dashboards
+    schema_version: "1.0"
+    key: [pickup_date, pickup_borough]
+    # Time-grained products grow by one month per load; the month is also how they are read.
+    partition_by: [pickup_year_month]
+
+  zone_monthly_statistics:
+    description: Q1's monthly pickup demand per zone, extended with trip profile and peak hour.
+    grain: one row per month and pickup zone
+    audience: planners placing taxi stands and dispatching vehicles
+    schema_version: "1.0"
+    key: [pickup_year_month, pu_location_id]
+    partition_by: [pickup_year_month]
+
+  weather_impact_summary:
+    description: Pickups per hour of each weather family for every zone, and how far each deviates from the zone's mean.
+    grain: one row per pickup zone and weather family
+    audience: operators planning fleet size for rain, snow and fog
+    schema_version: "1.0"
+    key: [pu_location_id, weather_family]
+    # ~1,200 rows with no time dimension: one file, nothing to partition on.
+    partition_by: []
+
+  hourly_air_quality_demand:
+    description: City-wide pickups per hour with PM2.5, its quartile and EPA category, and demand normalised for time of day.
+    grain: one row per UTC pickup hour
+    audience: public-health and environment analysts
+    schema_version: "1.0"
+    key: [pickup_hour]
+    partition_by: [pickup_year_month]

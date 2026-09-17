@@ -7,6 +7,7 @@ layers:
   silver: silver
   gold: gold
   benchmark: benchmark
+  products: products
   meta: _meta
 
 spark:

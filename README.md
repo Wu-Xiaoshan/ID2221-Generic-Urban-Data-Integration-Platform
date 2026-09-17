@@ -13,6 +13,7 @@ python jobs/run_integrate.py                   # 2. join them into gold/integrat
 python jobs/run_benchmark.py                   # 3. compare the two storage strategies
 python jobs/run_queries.py                     # 4. run the analytical queries (Week 2)
 python jobs/run_query_benchmark.py             # 5. run the optimisation experiments (Week 2)
+python jobs/run_products.py                    # 6. build the analytical data products (Week 2)
 ```
 
 Ingestion reads `data/raw/`, writes Delta tables to `data/lakehouse/silver/`, and appends one row
@@ -90,6 +91,48 @@ shows none of AQE's rewrites, so the executed plan is captured afterwards as `.f
 
 The analysis is in `BenchmarkReportWeek2.docx`.
 
+## Analytical data products (Week 2)
+
+Four Delta tables materialised from `gold/integrated_taxi_trips`, for analysts who need the result of
+a report rather than the query behind it.
+
+```bash
+python jobs/run_products.py --list                     # what is available
+python jobs/run_products.py                            # build or refresh all four
+python jobs/run_products.py weather_impact_summary     # or just one
+python jobs/run_products.py --if-stale                 # skip products already built from the current gold table
+python scripts/verify_products.py                      # check them
+```
+
+| Product | One row per | Partitioned by |
+|---|---|---|
+| `daily_mobility_summary` | New York local date and pickup borough | `pickup_year_month` |
+| `zone_monthly_statistics` | month and pickup zone | `pickup_year_month` |
+| `weather_impact_summary` | pickup zone and weather family | nothing |
+| `hourly_air_quality_demand` | UTC pickup hour | `pickup_year_month` |
+
+Products are written to `data/lakehouse/products/<name>`. Each one is a single Spark SQL statement in
+`src/urbanplatform/analytics/products.py` over the same views as the analytical queries, and
+`zone_monthly_statistics` embeds Q1 unchanged. Grain, schema version and layout are configuration,
+in `conf/products.yaml`.
+
+Metadata is recorded in two places. Every product table carries `product.*` Delta table properties:
+its source table and the Delta version of that table it was built from, creation and refresh time
+(UTC), schema version and a fingerprint of its columns. `_meta/data_product_metadata` gets one row
+per product per run with the same fields, plus row count, file count, size and duration. Changing a
+product's columns without bumping its `schema_version` fails the run, rather than silently changing
+the table under its readers.
+
+```python
+spark.sql("DESCRIBE DETAIL delta.`data/lakehouse/products/daily_mobility_summary`").select("properties").show(truncate=False)
+spark.read.format("delta").load("data/lakehouse/_meta/data_product_metadata").show()
+```
+
+`verify_products.py` checks the grain, metadata and freshness of every product, and that each one
+agrees with its source: daily trips add up to the gold table, `zone_monthly_statistics` equals Q1, and
+Q4's ranking and Q3's correlations can be recomputed from `weather_impact_summary` and
+`hourly_air_quality_demand`. Exits non-zero on failure.
+
 Reading the result:
 
 ```python
@@ -109,6 +152,7 @@ conf/
   platform.yaml               Spark settings and the lakehouse root
   datasets/*.yaml             one file per dataset: source, schema, renames, timestamps, quality rules
   integration.yaml            how the integration joins the four tables
+  products.yaml               the analytical data products: grain, schema version, layout
 src/urbanplatform/            the ingestion framework and the integration pipeline
   ingest.py                   one pipeline that runs every dataset
   integrate.py                builds gold/integrated_taxi_trips
@@ -121,7 +165,8 @@ data/lakehouse/               created by the jobs
   silver/                     one Delta table per dataset
   gold/                       integrated_taxi_trips
   benchmark/                  the two storage variants the benchmark compares
-  _meta/                      ingestion_metadata, integration_metadata, quarantine
+  products/                   the analytical data products
+  _meta/                      ingestion_metadata, integration_metadata, data_product_metadata, quarantine
 ```
 
 ## Adding a dataset
@@ -176,4 +221,6 @@ prints a fix for the first thing that fails.
 | `jobs/run_queries.py` | runs the Week 2 analytical query library | yes |
 | `jobs/run_query_benchmark.py` | runs the optimisation experiments, writes the measurements | yes |
 | `scripts/verify_analytics.py` | checks the analytical layer's correctness invariants | yes |
+| `jobs/run_products.py` | builds or refreshes the analytical data products and records their metadata | yes |
+| `scripts/verify_products.py` | checks the data products against their sources, and their metadata | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
