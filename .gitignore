@@ -1,8 +1,8 @@
-# Local documents, except the three the assignment asks to hand in.
+# Local documents, except the two reports this week's assignment asks to hand in.
+# The Week 1 documents stay on disk but are no longer tracked here.
 *.pdf
-!/DesignReportWeek1.pdf
-!/ArchitectureDiagramWeek1.pdf
-!/BenchmarkReportWeek1.pdf
+!/DesignReportWeek2.pdf
+!/BenchmarkReportWeek2.pdf
 /Assignment-week2.md
 
 # Source datasets: downloaded, not authored here (~2.4 GB).

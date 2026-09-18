@@ -147,11 +147,8 @@ Q4's ranking and Q3's correlations must come out the same when recomputed from
 ## Project layout
 
 ```
-DesignReportWeek1.pdf         the Week 1 design report
-ArchitectureDiagramWeek1.pdf  the Week 1 architecture diagram
-BenchmarkReportWeek1.pdf      the Week 1 benchmark report
-DesignReportWeek2.docx        the Week 2 design report
-BenchmarkReportWeek2.docx     the Week 2 benchmark report
+DesignReportWeek2.docx        the design report, also as .pdf
+BenchmarkReportWeek2.docx     the benchmark report, also as .pdf
 README.md                     this file
 conf/
   platform.yaml               Spark settings and the lakehouse root
