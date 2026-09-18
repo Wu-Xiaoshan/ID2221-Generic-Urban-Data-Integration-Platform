@@ -1,0 +1,64 @@
+# aqe_q6_daily_trend / AQE on
+
+== Physical Plan ==
+AdaptiveSparkPlan (10)
++- Project (9)
+   +- Window (8)
+      +- Sort (7)
+         +- Exchange (6)
+            +- HashAggregate (5)
+               +- Exchange (4)
+                  +- HashAggregate (3)
+                     +- Project (2)
+                        +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [2]: [pickup_date#69, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+ReadSchema: struct<pickup_date:date>
+
+(2) Project
+Output [1]: [pickup_date#69]
+Input [2]: [pickup_date#69, pickup_year_month#70]
+
+(3) HashAggregate
+Input [1]: [pickup_date#69]
+Keys [1]: [pickup_date#69]
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#90133L]
+Results [2]: [pickup_date#69, count#90134L]
+
+(4) Exchange
+Input [2]: [pickup_date#69, count#90134L]
+Arguments: hashpartitioning(pickup_date#69, 8), ENSURE_REQUIREMENTS, [plan_id=57870]
+
+(5) HashAggregate
+Input [2]: [pickup_date#69, count#90134L]
+Keys [1]: [pickup_date#69]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#90024L]
+Results [2]: [pickup_date#69, count(1)#90024L AS trip_count#89955L]
+
+(6) Exchange
+Input [2]: [pickup_date#69, trip_count#89955L]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=57873]
+
+(7) Sort
+Input [2]: [pickup_date#69, trip_count#89955L]
+Arguments: [pickup_date#69 ASC NULLS FIRST], false, 0
+
+(8) Window
+Input [2]: [pickup_date#69, trip_count#89955L]
+Arguments: [avg(trip_count#89955L) windowspecdefinition(pickup_date#69 ASC NULLS FIRST, specifiedwindowframe(RowFrame, -6, currentrow$())) AS _we0#90026], [pickup_date#69 ASC NULLS FIRST]
+
+(9) Project
+Output [3]: [pickup_date#69, trip_count#89955L, round(_we0#90026, 1) AS ma7#89954]
+Input [3]: [pickup_date#69, trip_count#89955L, _we0#90026]
+
+(10) AdaptiveSparkPlan
+Output [3]: [pickup_date#69, trip_count#89955L, ma7#89954]
+Arguments: isFinalPlan=false
+
+

@@ -2,30 +2,30 @@
 
 AdaptiveSparkPlan isFinalPlan=true
 +- == Final Plan ==
-   *(3) Sort [trip_count#1202L DESC NULLS LAST], true, 0
+   *(3) Sort [trip_count#1333L DESC NULLS LAST], true, 0
    +- AQEShuffleRead coalesced
       +- ShuffleQueryStage 1
-         +- Exchange rangepartitioning(trip_count#1202L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=529]
-            +- SortAggregate(key=[pickup_year_month#126, pu_location_id#105], functions=[max(pickup_zone#148), max(pickup_borough#147), count(1)], output=[pickup_year_month#126, pu_location_id#105, pickup_zone#1200, pickup_borough#1201, trip_count#1202L])
-               +- *(2) Sort [pickup_year_month#126 ASC NULLS FIRST, pu_location_id#105 ASC NULLS FIRST], false, 0
+         +- Exchange rangepartitioning(trip_count#1333L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=519]
+            +- SortAggregate(key=[pickup_year_month#70, pu_location_id#49], functions=[max(pickup_zone#92), max(pickup_borough#91), count(1)], output=[pickup_year_month#70, pu_location_id#49, pickup_zone#1331, pickup_borough#1332, trip_count#1333L])
+               +- *(2) Sort [pickup_year_month#70 ASC NULLS FIRST, pu_location_id#49 ASC NULLS FIRST], false, 0
                   +- AQEShuffleRead coalesced
                      +- ShuffleQueryStage 0
-                        +- Exchange hashpartitioning(pickup_year_month#126, pu_location_id#105, 8), ENSURE_REQUIREMENTS, [plan_id=490]
-                           +- SortAggregate(key=[pickup_year_month#126, pu_location_id#105], functions=[partial_max(pickup_zone#148), partial_max(pickup_borough#147), partial_count(1)], output=[pickup_year_month#126, pu_location_id#105, max#1354, max#1355, count#1356L])
-                              +- *(1) Sort [pickup_year_month#126 ASC NULLS FIRST, pu_location_id#105 ASC NULLS FIRST], false, 0
-                                 +- *(1) Project [pu_location_id#105, pickup_year_month#126, pickup_borough#147, pickup_zone#148]
-                                    +- *(1) Filter (((isnotnull(pickup_date#125) AND (pickup_date#125 >= 2024-02-01)) AND (pickup_date#125 <= 2024-02-29)) AND NOT pu_location_id#105 IN (264,265))
+                        +- Exchange hashpartitioning(pickup_year_month#70, pu_location_id#49, 8), ENSURE_REQUIREMENTS, [plan_id=480]
+                           +- SortAggregate(key=[pickup_year_month#70, pu_location_id#49], functions=[partial_max(pickup_zone#92), partial_max(pickup_borough#91), partial_count(1)], output=[pickup_year_month#70, pu_location_id#49, max#1485, max#1486, count#1487L])
+                              +- *(1) Sort [pickup_year_month#70 ASC NULLS FIRST, pu_location_id#49 ASC NULLS FIRST], false, 0
+                                 +- *(1) Project [pu_location_id#49, pickup_year_month#70, pickup_borough#91, pickup_zone#92]
+                                    +- *(1) Filter (((isnotnull(pickup_date#69) AND (pickup_date#69 >= 2024-02-01)) AND (pickup_date#69 <= 2024-02-29)) AND NOT pu_location_id#49 IN (264,265))
                                        +- *(1) ColumnarToRow
-                                          +- FileScan parquet [pu_location_id#105,pickup_date#125,pickup_borough#147,pickup_zone#148,pickup_year_month#126] Batched: true, DataFilters: [isnotnull(pickup_date#125), (pickup_date#125 >= 2024-02-01), (pickup_date#125 <= 2024-02-29), NO..., Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [], PushedFilters: [IsNotNull(pickup_date), GreaterThanOrEqual(pickup_date,2024-02-01), LessThanOrEqual(pickup_date,..., ReadSchema: struct<pu_location_id:int,pickup_date:date,pickup_borough:string,pickup_zone:string>
+                                          +- FileScan parquet [pu_location_id#49,pickup_date#69,pickup_borough#91,pickup_zone#92,pickup_year_month#70] Batched: true, DataFilters: [isnotnull(pickup_date#69), (pickup_date#69 >= 2024-02-01), (pickup_date#69 <= 2024-02-29), NOT p..., Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [IsNotNull(pickup_date), GreaterThanOrEqual(pickup_date,2024-02-01), LessThanOrEqual(pickup_date,..., ReadSchema: struct<pu_location_id:int,pickup_date:date,pickup_borough:string,pickup_zone:string>
 +- == Initial Plan ==
-   Sort [trip_count#1202L DESC NULLS LAST], true, 0
-   +- Exchange rangepartitioning(trip_count#1202L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=458]
-      +- SortAggregate(key=[pickup_year_month#126, pu_location_id#105], functions=[max(pickup_zone#148), max(pickup_borough#147), count(1)], output=[pickup_year_month#126, pu_location_id#105, pickup_zone#1200, pickup_borough#1201, trip_count#1202L])
-         +- Sort [pickup_year_month#126 ASC NULLS FIRST, pu_location_id#105 ASC NULLS FIRST], false, 0
-            +- Exchange hashpartitioning(pickup_year_month#126, pu_location_id#105, 8), ENSURE_REQUIREMENTS, [plan_id=454]
-               +- SortAggregate(key=[pickup_year_month#126, pu_location_id#105], functions=[partial_max(pickup_zone#148), partial_max(pickup_borough#147), partial_count(1)], output=[pickup_year_month#126, pu_location_id#105, max#1354, max#1355, count#1356L])
-                  +- Sort [pickup_year_month#126 ASC NULLS FIRST, pu_location_id#105 ASC NULLS FIRST], false, 0
-                     +- Project [pu_location_id#105, pickup_year_month#126, pickup_borough#147, pickup_zone#148]
-                        +- Filter (((isnotnull(pickup_date#125) AND (pickup_date#125 >= 2024-02-01)) AND (pickup_date#125 <= 2024-02-29)) AND NOT pu_location_id#105 IN (264,265))
-                           +- FileScan parquet [pu_location_id#105,pickup_date#125,pickup_borough#147,pickup_zone#148,pickup_year_month#126] Batched: true, DataFilters: [isnotnull(pickup_date#125), (pickup_date#125 >= 2024-02-01), (pickup_date#125 <= 2024-02-29), NO..., Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [], PushedFilters: [IsNotNull(pickup_date), GreaterThanOrEqual(pickup_date,2024-02-01), LessThanOrEqual(pickup_date,..., ReadSchema: struct<pu_location_id:int,pickup_date:date,pickup_borough:string,pickup_zone:string>
+   Sort [trip_count#1333L DESC NULLS LAST], true, 0
+   +- Exchange rangepartitioning(trip_count#1333L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=448]
+      +- SortAggregate(key=[pickup_year_month#70, pu_location_id#49], functions=[max(pickup_zone#92), max(pickup_borough#91), count(1)], output=[pickup_year_month#70, pu_location_id#49, pickup_zone#1331, pickup_borough#1332, trip_count#1333L])
+         +- Sort [pickup_year_month#70 ASC NULLS FIRST, pu_location_id#49 ASC NULLS FIRST], false, 0
+            +- Exchange hashpartitioning(pickup_year_month#70, pu_location_id#49, 8), ENSURE_REQUIREMENTS, [plan_id=444]
+               +- SortAggregate(key=[pickup_year_month#70, pu_location_id#49], functions=[partial_max(pickup_zone#92), partial_max(pickup_borough#91), partial_count(1)], output=[pickup_year_month#70, pu_location_id#49, max#1485, max#1486, count#1487L])
+                  +- Sort [pickup_year_month#70 ASC NULLS FIRST, pu_location_id#49 ASC NULLS FIRST], false, 0
+                     +- Project [pu_location_id#49, pickup_year_month#70, pickup_borough#91, pickup_zone#92]
+                        +- Filter (((isnotnull(pickup_date#69) AND (pickup_date#69 >= 2024-02-01)) AND (pickup_date#69 <= 2024-02-29)) AND NOT pu_location_id#49 IN (264,265))
+                           +- FileScan parquet [pu_location_id#49,pickup_date#69,pickup_borough#91,pickup_zone#92,pickup_year_month#70] Batched: true, DataFilters: [isnotnull(pickup_date#69), (pickup_date#69 >= 2024-02-01), (pickup_date#69 <= 2024-02-29), NOT p..., Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [IsNotNull(pickup_date), GreaterThanOrEqual(pickup_date,2024-02-01), LessThanOrEqual(pickup_date,..., ReadSchema: struct<pu_location_id:int,pickup_date:date,pickup_borough:string,pickup_zone:string>
 

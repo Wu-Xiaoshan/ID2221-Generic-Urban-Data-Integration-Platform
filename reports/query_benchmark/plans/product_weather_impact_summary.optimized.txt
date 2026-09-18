@@ -1,0 +1,59 @@
+# product_weather_impact_summary / recompute from weather_impact_summary
+
+== Physical Plan ==
+AdaptiveSparkPlan (9)
++- Sort (8)
+   +- Exchange (7)
+      +- Project (6)
+         +- Filter (5)
+            +- HashAggregate (4)
+               +- Exchange (3)
+                  +- HashAggregate (2)
+                     +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [3]: [pu_location_id#618, trip_count#623L, trips_per_hour#624]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/products/weather_impact_summary]
+ReadSchema: struct<pu_location_id:int,trip_count:bigint,trips_per_hour:double>
+
+(2) HashAggregate
+Input [3]: [pu_location_id#618, trip_count#623L, trips_per_hour#624]
+Keys [1]: [pu_location_id#618]
+Functions [4]: [partial_stddev_samp(trips_per_hour#624), partial_avg(trips_per_hour#624), partial_count(1), partial_sum(trip_count#623L)]
+Aggregate Attributes [7]: [n#97768, avg#97769, m2#97770, sum#97896, count#97897L, count#97898L, sum#97899L]
+Results [8]: [pu_location_id#618, n#97773, avg#97774, m2#97775, sum#97900, count#97901L, count#97902L, sum#97903L]
+
+(3) Exchange
+Input [8]: [pu_location_id#618, n#97773, avg#97774, m2#97775, sum#97900, count#97901L, count#97902L, sum#97903L]
+Arguments: hashpartitioning(pu_location_id#618, 8), ENSURE_REQUIREMENTS, [plan_id=62709]
+
+(4) HashAggregate
+Input [8]: [pu_location_id#618, n#97773, avg#97774, m2#97775, sum#97900, count#97901L, count#97902L, sum#97903L]
+Keys [1]: [pu_location_id#618]
+Functions [4]: [stddev_samp(trips_per_hour#624), avg(trips_per_hour#624), count(1), sum(trip_count#623L)]
+Aggregate Attributes [4]: [stddev_samp(trips_per_hour#624)#97776, avg(trips_per_hour#624)#97777, count(1)#97778L, sum(trip_count#623L)#97779L]
+Results [4]: [pu_location_id#618, round((stddev_samp(trips_per_hour#624)#97776 / avg(trips_per_hour#624)#97777), 4) AS coef_of_variation#97762, count(1)#97778L AS count(1)#97788L, sum(trip_count#623L)#97779L AS sum(trip_count#623L)#97789L]
+
+(5) Filter
+Input [4]: [pu_location_id#618, coef_of_variation#97762, count(1)#97788L, sum(trip_count#623L)#97789L]
+Condition : (isnotnull(sum(trip_count#623L)#97789L) AND ((count(1)#97788L >= 4) AND (sum(trip_count#623L)#97789L >= 10000)))
+
+(6) Project
+Output [2]: [pu_location_id#618, coef_of_variation#97762]
+Input [4]: [pu_location_id#618, coef_of_variation#97762, count(1)#97788L, sum(trip_count#623L)#97789L]
+
+(7) Exchange
+Input [2]: [pu_location_id#618, coef_of_variation#97762]
+Arguments: rangepartitioning(pu_location_id#618 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=62714]
+
+(8) Sort
+Input [2]: [pu_location_id#618, coef_of_variation#97762]
+Arguments: [pu_location_id#618 ASC NULLS FIRST], true, 0
+
+(9) AdaptiveSparkPlan
+Output [2]: [pu_location_id#618, coef_of_variation#97762]
+Arguments: isFinalPlan=false
+
+

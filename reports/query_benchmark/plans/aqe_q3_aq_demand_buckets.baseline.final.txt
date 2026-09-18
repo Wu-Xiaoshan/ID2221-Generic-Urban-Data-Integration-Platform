@@ -1,0 +1,21 @@
+# aqe_q3_aq_demand_buckets / AQE off
+
+*(6) Sort [aq_quartile#65611 ASC NULLS FIRST], true, 0
++- Exchange rangepartitioning(aq_quartile#65611 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=38823]
+   +- *(5) HashAggregate(keys=[aq_quartile#65611], functions=[count(1), min(pm25#65607), max(pm25#65607), avg(trip_count#65606L), avg(demand_index#65621)], output=[aq_quartile#65611, hours#65600L, pm25_min#65601, pm25_max#65602, avg_trips_per_hour#65603, avg_demand_index#65604])
+      +- Exchange hashpartitioning(aq_quartile#65611, 8), ENSURE_REQUIREMENTS, [plan_id=38819]
+         +- *(4) HashAggregate(keys=[aq_quartile#65611], functions=[partial_count(1), partial_min(pm25#65607), partial_max(pm25#65607), partial_avg(trip_count#65606L), partial_avg(demand_index#65621)], output=[aq_quartile#65611, count#65789L, min#65790, max#65791, sum#65792, count#65793L, sum#65794, count#65795L])
+            +- *(4) Project [trip_count#65606L, pm25#65607, aq_quartile#65611, (cast(trip_count#65606L as double) / _we0#65693) AS demand_index#65621]
+               +- Window [avg(trip_count#65606L) windowspecdefinition(local_hour#65609, day_type#65610, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#65693], [local_hour#65609, day_type#65610]
+                  +- *(3) Sort [local_hour#65609 ASC NULLS FIRST, day_type#65610 ASC NULLS FIRST], false, 0
+                     +- Exchange hashpartitioning(local_hour#65609, day_type#65610, 8), ENSURE_REQUIREMENTS, [plan_id=38810]
+                        +- SortAggregate(key=[pickup_hour#50], functions=[count(1), max(aq_pm25_ugm3#86), max(local_hour#65677), max(day_type#65680), max(aq_quartile#65683)], output=[trip_count#65606L, pm25#65607, local_hour#65609, day_type#65610, aq_quartile#65611])
+                           +- *(2) Sort [pickup_hour#50 ASC NULLS FIRST], false, 0
+                              +- Exchange hashpartitioning(pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=38805]
+                                 +- SortAggregate(key=[pickup_hour#50], functions=[partial_count(1), partial_max(aq_pm25_ugm3#86), partial_max(local_hour#65677), partial_max(day_type#65680), partial_max(aq_quartile#65683)], output=[pickup_hour#50, count#65801L, max#65802, max#65803, max#65804, max#65805])
+                                    +- *(1) Sort [pickup_hour#50 ASC NULLS FIRST], false, 0
+                                       +- *(1) Project [pickup_hour#50, aq_pm25_ugm3#86, hour(from_utc_timestamp(pickup_ts#65, America/New_York), Some(UTC)) AS local_hour#65677, CASE WHEN dayofweek(pickup_date#69) IN (1,7) THEN weekend ELSE weekday END AS day_type#65680, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 3.68) THEN Q1 cleanest WHEN (aq_pm25_ugm3#86 <= 5.56) THEN Q2 WHEN (aq_pm25_ugm3#86 <= 8.86) THEN Q3 ELSE Q4 dirtiest END AS aq_quartile#65683]
+                                          +- *(1) Filter (isnotnull(air_quality_is_missing#90) AND NOT air_quality_is_missing#90)
+                                             +- *(1) ColumnarToRow
+                                                +- FileScan parquet [pickup_hour#50,pickup_ts#65,pickup_date#69,aq_pm25_ugm3#86,air_quality_is_missing#90,pickup_year_month#70] Batched: true, DataFilters: [isnotnull(air_quality_is_missing#90), NOT air_quality_is_missing#90], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))], ReadSchema: struct<pickup_hour:timestamp,pickup_ts:timestamp,pickup_date:date,aq_pm25_ugm3:double,air_quality...
+

@@ -1,0 +1,100 @@
+# aqe_q3_aq_demand_correlation / AQE off
+
+== Physical Plan ==
+* HashAggregate (16)
++- Exchange (15)
+   +- * HashAggregate (14)
+      +- * Project (13)
+         +- Window (12)
+            +- * Sort (11)
+               +- Exchange (10)
+                  +- SortAggregate (9)
+                     +- * Sort (8)
+                        +- Exchange (7)
+                           +- SortAggregate (6)
+                              +- * Sort (5)
+                                 +- * Project (4)
+                                    +- * Filter (3)
+                                       +- * ColumnarToRow (2)
+                                          +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [6]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))]
+ReadSchema: struct<pickup_hour:timestamp,pickup_ts:timestamp,pickup_date:date,aq_pm25_ugm3:double,air_quality_is_missing:boolean>
+
+(2) ColumnarToRow [codegen id : 1]
+Input [6]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+
+(3) Filter [codegen id : 1]
+Input [6]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+Condition : (isnotnull(air_quality_is_missing#90) AND NOT air_quality_is_missing#90)
+
+(4) Project [codegen id : 1]
+Output [4]: [pickup_hour#50, aq_pm25_ugm3#86, hour(from_utc_timestamp(pickup_ts#65, America/New_York), Some(UTC)) AS local_hour#68557, CASE WHEN dayofweek(pickup_date#69) IN (1,7) THEN weekend ELSE weekday END AS day_type#68560]
+Input [6]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+
+(5) Sort [codegen id : 1]
+Input [4]: [pickup_hour#50, aq_pm25_ugm3#86, local_hour#68557, day_type#68560]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
+
+(6) SortAggregate
+Input [4]: [pickup_hour#50, aq_pm25_ugm3#86, local_hour#68557, day_type#68560]
+Keys [1]: [pickup_hour#50]
+Functions [4]: [partial_count(1), partial_max(aq_pm25_ugm3#86), partial_max(local_hour#68557), partial_max(day_type#68560)]
+Aggregate Attributes [4]: [count#68757L, max#68758, max#68759, max#68760]
+Results [5]: [pickup_hour#50, count#68761L, max#68762, max#68763, max#68764]
+
+(7) Exchange
+Input [5]: [pickup_hour#50, count#68761L, max#68762, max#68763, max#68764]
+Arguments: hashpartitioning(pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=41168]
+
+(8) Sort [codegen id : 2]
+Input [5]: [pickup_hour#50, count#68761L, max#68762, max#68763, max#68764]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
+
+(9) SortAggregate
+Input [5]: [pickup_hour#50, count#68761L, max#68762, max#68763, max#68764]
+Keys [1]: [pickup_hour#50]
+Functions [4]: [count(1), max(aq_pm25_ugm3#86), max(local_hour#68557), max(day_type#68560)]
+Aggregate Attributes [4]: [count(1)#68565L, max(aq_pm25_ugm3#86)#68566, max(local_hour#68557)#68568, max(day_type#68560)#68569]
+Results [4]: [count(1)#68565L AS trip_count#68486L, max(aq_pm25_ugm3#86)#68566 AS pm25#68487, max(local_hour#68557)#68568 AS local_hour#68489, max(day_type#68560)#68569 AS day_type#68490]
+
+(10) Exchange
+Input [4]: [trip_count#68486L, pm25#68487, local_hour#68489, day_type#68490]
+Arguments: hashpartitioning(local_hour#68489, day_type#68490, 8), ENSURE_REQUIREMENTS, [plan_id=41173]
+
+(11) Sort [codegen id : 3]
+Input [4]: [trip_count#68486L, pm25#68487, local_hour#68489, day_type#68490]
+Arguments: [local_hour#68489 ASC NULLS FIRST, day_type#68490 ASC NULLS FIRST], false, 0
+
+(12) Window
+Input [4]: [trip_count#68486L, pm25#68487, local_hour#68489, day_type#68490]
+Arguments: [avg(trip_count#68486L) windowspecdefinition(local_hour#68489, day_type#68490, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#68573], [local_hour#68489, day_type#68490]
+
+(13) Project [codegen id : 4]
+Output [3]: [trip_count#68486L, pm25#68487, (cast(trip_count#68486L as double) / _we0#68573) AS demand_index#68501]
+Input [5]: [trip_count#68486L, pm25#68487, local_hour#68489, day_type#68490, _we0#68573]
+
+(14) HashAggregate [codegen id : 4]
+Input [3]: [trip_count#68486L, pm25#68487, demand_index#68501]
+Keys: []
+Functions [4]: [partial_count(1), partial_avg(pm25#68487), partial_corr(cast(trip_count#68486L as double), pm25#68487), partial_corr(demand_index#68501, pm25#68487)]
+Aggregate Attributes [15]: [count#68751L, sum#68752, count#68753L, n#68626, xAvg#68627, yAvg#68628, ck#68629, xMk#68630, yMk#68631, n#68638, xAvg#68639, yAvg#68640, ck#68641, xMk#68642, yMk#68643]
+Results [15]: [count#68754L, sum#68755, count#68756L, n#68632, xAvg#68633, yAvg#68634, ck#68635, xMk#68636, yMk#68637, n#68644, xAvg#68645, yAvg#68646, ck#68647, xMk#68648, yMk#68649]
+
+(15) Exchange
+Input [15]: [count#68754L, sum#68755, count#68756L, n#68632, xAvg#68633, yAvg#68634, ck#68635, xMk#68636, yMk#68637, n#68644, xAvg#68645, yAvg#68646, ck#68647, xMk#68648, yMk#68649]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=41182]
+
+(16) HashAggregate [codegen id : 5]
+Input [15]: [count#68754L, sum#68755, count#68756L, n#68632, xAvg#68633, yAvg#68634, ck#68635, xMk#68636, yMk#68637, n#68644, xAvg#68645, yAvg#68646, ck#68647, xMk#68648, yMk#68649]
+Keys: []
+Functions [4]: [count(1), avg(pm25#68487), corr(cast(trip_count#68486L as double), pm25#68487), corr(demand_index#68501, pm25#68487)]
+Aggregate Attributes [4]: [count(1)#68574L, avg(pm25#68487)#68575, corr(cast(trip_count#68486L as double), pm25#68487)#68588, corr(demand_index#68501, pm25#68487)#68601]
+Results [4]: [count(1)#68574L AS hours#68476L, round(avg(pm25#68487)#68575, 2) AS avg_pm25#68477, round(corr(cast(trip_count#68486L as double), pm25#68487)#68588, 4) AS corr_raw#68478, round(corr(demand_index#68501, pm25#68487)#68601, 4) AS corr_controlled#68479]
+
+

@@ -1,0 +1,86 @@
+# aqe_q2_precip_distance / AQE on
+
+== Physical Plan ==
+AdaptiveSparkPlan (13)
++- Sort (12)
+   +- Exchange (11)
+      +- Filter (10)
+         +- ObjectHashAggregate (9)
+            +- Exchange (8)
+               +- ObjectHashAggregate (7)
+                  +- ObjectHashAggregate (6)
+                     +- Exchange (5)
+                        +- ObjectHashAggregate (4)
+                           +- Project (3)
+                              +- Filter (2)
+                                 +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [7]: [pickup_hour#50, trip_distance_mi#53, trip_duration_min#68, dq_zero_distance#73, weather_precipitation_mm#78, weather_is_missing#85, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [IsNotNull(weather_is_missing), IsNotNull(dq_zero_distance), IsNotNull(trip_duration_min), Not(EqualTo(weather_is_missing,true)), Not(EqualTo(dq_zero_distance,true)), GreaterThan(trip_duration_min,0.0)]
+ReadSchema: struct<pickup_hour:timestamp,trip_distance_mi:double,trip_duration_min:double,dq_zero_distance:boolean,weather_precipitation_mm:double,weather_is_missing:boolean>
+
+(2) Filter
+Input [7]: [pickup_hour#50, trip_distance_mi#53, trip_duration_min#68, dq_zero_distance#73, weather_precipitation_mm#78, weather_is_missing#85, pickup_year_month#70]
+Condition : ((((((isnotnull(weather_is_missing#85) AND isnotnull(dq_zero_distance#73)) AND isnotnull(trip_duration_min#68)) AND NOT weather_is_missing#85) AND NOT dq_zero_distance#73) AND CASE WHEN isnull(weather_precipitation_mm#78) THEN false WHEN (weather_precipitation_mm#78 <= 0.0) THEN true WHEN (weather_precipitation_mm#78 <= 0.5) THEN true WHEN (weather_precipitation_mm#78 <= 2.5) THEN true ELSE true END) AND (trip_duration_min#68 > 0.0))
+
+(3) Project
+Output [4]: [pickup_hour#50, trip_distance_mi#53, trip_duration_min#68, CASE WHEN isnull(weather_precipitation_mm#78) THEN null WHEN (weather_precipitation_mm#78 <= 0.0) THEN Dry WHEN (weather_precipitation_mm#78 <= 0.5) THEN Light WHEN (weather_precipitation_mm#78 <= 2.5) THEN Moderate ELSE Heavy END AS precip_bucket#61785]
+Input [7]: [pickup_hour#50, trip_distance_mi#53, trip_duration_min#68, dq_zero_distance#73, weather_precipitation_mm#78, weather_is_missing#85, pickup_year_month#70]
+
+(4) ObjectHashAggregate
+Input [4]: [pickup_hour#50, trip_distance_mi#53, trip_duration_min#68, precip_bucket#61785]
+Keys [2]: [precip_bucket#61785, pickup_hour#50]
+Functions [7]: [partial_count(1), partial_sum(CASE WHEN (trip_distance_mi#53 > 100.0) THEN 1 ELSE 0 END), partial_avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END), partial_percentile_approx(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END, 0.5, 10000, 0, 0), partial_stddev_samp(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END), partial_avg(trip_duration_min#68), partial_avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN (trip_distance_mi#53 / (trip_duration_min#68 / 60.0)) END)]
+Aggregate Attributes [7]: [count(1)#61788L, sum(CASE WHEN (trip_distance_mi#53 > 100.0) THEN 1 ELSE 0 END)#61791L, avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END)#61792, percentile_approx(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END, 0.5, 10000, 0, 0)#61793, stddev_samp(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END)#61802, avg(trip_duration_min#68)#61790, avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN (trip_distance_mi#53 / (trip_duration_min#68 / 60.0)) END)#61803]
+Results [14]: [precip_bucket#61785, pickup_hour#50, count#61923L, sum#61925L, sum#61928, count#61929L, buf#61931, n#61834, avg#61835, m2#61836, sum#61934, count#61935L, sum#61938, count#61939L]
+
+(5) Exchange
+Input [14]: [precip_bucket#61785, pickup_hour#50, count#61923L, sum#61925L, sum#61928, count#61929L, buf#61931, n#61834, avg#61835, m2#61836, sum#61934, count#61935L, sum#61938, count#61939L]
+Arguments: hashpartitioning(precip_bucket#61785, pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=37357]
+
+(6) ObjectHashAggregate
+Input [14]: [precip_bucket#61785, pickup_hour#50, count#61923L, sum#61925L, sum#61928, count#61929L, buf#61931, n#61834, avg#61835, m2#61836, sum#61934, count#61935L, sum#61938, count#61939L]
+Keys [2]: [precip_bucket#61785, pickup_hour#50]
+Functions [7]: [merge_count(1), merge_sum(CASE WHEN (trip_distance_mi#53 > 100.0) THEN 1 ELSE 0 END), merge_avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END), merge_percentile_approx(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END, 0.5, 10000, 0, 0), merge_stddev_samp(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END), merge_avg(trip_duration_min#68), merge_avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN (trip_distance_mi#53 / (trip_duration_min#68 / 60.0)) END)]
+Aggregate Attributes [7]: [count(1)#61788L, sum(CASE WHEN (trip_distance_mi#53 > 100.0) THEN 1 ELSE 0 END)#61791L, avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END)#61792, percentile_approx(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END, 0.5, 10000, 0, 0)#61793, stddev_samp(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END)#61802, avg(trip_duration_min#68)#61790, avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN (trip_distance_mi#53 / (trip_duration_min#68 / 60.0)) END)#61803]
+Results [14]: [precip_bucket#61785, pickup_hour#50, count#61923L, sum#61925L, sum#61928, count#61929L, buf#61931, n#61834, avg#61835, m2#61836, sum#61934, count#61935L, sum#61938, count#61939L]
+
+(7) ObjectHashAggregate
+Input [14]: [precip_bucket#61785, pickup_hour#50, count#61923L, sum#61925L, sum#61928, count#61929L, buf#61931, n#61834, avg#61835, m2#61836, sum#61934, count#61935L, sum#61938, count#61939L]
+Keys [1]: [precip_bucket#61785]
+Functions [8]: [merge_count(1), merge_sum(CASE WHEN (trip_distance_mi#53 > 100.0) THEN 1 ELSE 0 END), merge_avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END), merge_percentile_approx(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END, 0.5, 10000, 0, 0), merge_stddev_samp(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END), merge_avg(trip_duration_min#68), merge_avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN (trip_distance_mi#53 / (trip_duration_min#68 / 60.0)) END), partial_count(distinct pickup_hour#50)]
+Aggregate Attributes [8]: [count(1)#61788L, sum(CASE WHEN (trip_distance_mi#53 > 100.0) THEN 1 ELSE 0 END)#61791L, avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END)#61792, percentile_approx(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END, 0.5, 10000, 0, 0)#61793, stddev_samp(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END)#61802, avg(trip_duration_min#68)#61790, avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN (trip_distance_mi#53 / (trip_duration_min#68 / 60.0)) END)#61803, count(pickup_hour#50)#61789L]
+Results [14]: [precip_bucket#61785, count#61923L, sum#61925L, sum#61928, count#61929L, buf#61931, n#61834, avg#61835, m2#61836, sum#61934, count#61935L, sum#61938, count#61939L, count#61942L]
+
+(8) Exchange
+Input [14]: [precip_bucket#61785, count#61923L, sum#61925L, sum#61928, count#61929L, buf#61931, n#61834, avg#61835, m2#61836, sum#61934, count#61935L, sum#61938, count#61939L, count#61942L]
+Arguments: hashpartitioning(precip_bucket#61785, 8), ENSURE_REQUIREMENTS, [plan_id=37361]
+
+(9) ObjectHashAggregate
+Input [14]: [precip_bucket#61785, count#61923L, sum#61925L, sum#61928, count#61929L, buf#61931, n#61834, avg#61835, m2#61836, sum#61934, count#61935L, sum#61938, count#61939L, count#61942L]
+Keys [1]: [precip_bucket#61785]
+Functions [8]: [count(1), sum(CASE WHEN (trip_distance_mi#53 > 100.0) THEN 1 ELSE 0 END), avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END), percentile_approx(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END, 0.5, 10000, 0, 0), stddev_samp(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END), avg(trip_duration_min#68), avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN (trip_distance_mi#53 / (trip_duration_min#68 / 60.0)) END), count(distinct pickup_hour#50)]
+Aggregate Attributes [8]: [count(1)#61788L, sum(CASE WHEN (trip_distance_mi#53 > 100.0) THEN 1 ELSE 0 END)#61791L, avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END)#61792, percentile_approx(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END, 0.5, 10000, 0, 0)#61793, stddev_samp(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END)#61802, avg(trip_duration_min#68)#61790, avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN (trip_distance_mi#53 / (trip_duration_min#68 / 60.0)) END)#61803, count(pickup_hour#50)#61789L]
+Results [9]: [precip_bucket#61785, count(1)#61788L AS trip_count#61712L, count(pickup_hour#50)#61789L AS hours_observed#61713L, sum(CASE WHEN (trip_distance_mi#53 > 100.0) THEN 1 ELSE 0 END)#61791L AS distance_outliers_excluded#61714L, round(avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END)#61792, 3) AS avg_distance_mi#61715, round(percentile_approx(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END, 0.5, 10000, 0, 0)#61793, 3) AS median_distance_mi#61716, round(stddev_samp(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN trip_distance_mi#53 END)#61802, 3) AS stddev_distance_mi#61717, round(avg(trip_duration_min#68)#61790, 2) AS avg_duration_min#61718, round(avg(CASE WHEN (trip_distance_mi#53 <= 100.0) THEN (trip_distance_mi#53 / (trip_duration_min#68 / 60.0)) END)#61803, 2) AS avg_speed_mph#61719]
+
+(10) Filter
+Input [9]: [precip_bucket#61785, trip_count#61712L, hours_observed#61713L, distance_outliers_excluded#61714L, avg_distance_mi#61715, median_distance_mi#61716, stddev_distance_mi#61717, avg_duration_min#61718, avg_speed_mph#61719]
+Condition : (hours_observed#61713L >= 24)
+
+(11) Exchange
+Input [9]: [precip_bucket#61785, trip_count#61712L, hours_observed#61713L, distance_outliers_excluded#61714L, avg_distance_mi#61715, median_distance_mi#61716, stddev_distance_mi#61717, avg_duration_min#61718, avg_speed_mph#61719]
+Arguments: rangepartitioning(avg_distance_mi#61715 DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=37365]
+
+(12) Sort
+Input [9]: [precip_bucket#61785, trip_count#61712L, hours_observed#61713L, distance_outliers_excluded#61714L, avg_distance_mi#61715, median_distance_mi#61716, stddev_distance_mi#61717, avg_duration_min#61718, avg_speed_mph#61719]
+Arguments: [avg_distance_mi#61715 DESC NULLS LAST], true, 0
+
+(13) AdaptiveSparkPlan
+Output [9]: [precip_bucket#61785, trip_count#61712L, hours_observed#61713L, distance_outliers_excluded#61714L, avg_distance_mi#61715, median_distance_mi#61716, stddev_distance_mi#61717, avg_duration_min#61718, avg_speed_mph#61719]
+Arguments: isFinalPlan=false
+
+

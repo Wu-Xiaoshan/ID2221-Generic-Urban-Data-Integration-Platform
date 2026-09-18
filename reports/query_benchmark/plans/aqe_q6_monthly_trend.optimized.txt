@@ -1,0 +1,100 @@
+# aqe_q6_monthly_trend / AQE on
+
+== Physical Plan ==
+AdaptiveSparkPlan (17)
++- Sort (16)
+   +- Exchange (15)
+      +- Project (14)
+         +- Window (13)
+            +- Sort (12)
+               +- Exchange (11)
+                  +- Window (10)
+                     +- Sort (9)
+                        +- Exchange (8)
+                           +- Project (7)
+                              +- HashAggregate (6)
+                                 +- Exchange (5)
+                                    +- HashAggregate (4)
+                                       +- Project (3)
+                                          +- Filter (2)
+                                             +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [3]: [pu_location_id#49, pickup_borough#91, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [Not(In(pu_location_id, [264,265]))]
+ReadSchema: struct<pu_location_id:int,pickup_borough:string>
+
+(2) Filter
+Input [3]: [pu_location_id#49, pickup_borough#91, pickup_year_month#70]
+Condition : NOT pu_location_id#49 IN (264,265)
+
+(3) Project
+Output [2]: [pickup_year_month#70, pickup_borough#91]
+Input [3]: [pu_location_id#49, pickup_borough#91, pickup_year_month#70]
+
+(4) HashAggregate
+Input [2]: [pickup_year_month#70, pickup_borough#91]
+Keys [2]: [pickup_year_month#70, pickup_borough#91]
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#87533L]
+Results [3]: [pickup_year_month#70, pickup_borough#91, count#87534L]
+
+(5) Exchange
+Input [3]: [pickup_year_month#70, pickup_borough#91, count#87534L]
+Arguments: hashpartitioning(pickup_year_month#70, pickup_borough#91, 8), ENSURE_REQUIREMENTS, [plan_id=55592]
+
+(6) HashAggregate
+Input [3]: [pickup_year_month#70, pickup_borough#91, count#87534L]
+Keys [2]: [pickup_year_month#70, pickup_borough#91]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#87450L]
+Results [4]: [pickup_year_month#70, pickup_borough#91, count(1)#87450L AS trip_count#87380L, (cast(count(1)#87450L as double) / cast(day(last_day(cast(concat(pickup_year_month#70, -01) as date))) as double)) AS trips_per_day#87381]
+
+(7) Project
+Output [5]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, round(trips_per_day#87381, 1) AS trips_per_day#87377, trips_per_day#87381]
+Input [4]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87381]
+
+(8) Exchange
+Input [5]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, trips_per_day#87381]
+Arguments: hashpartitioning(pickup_borough#91, 8), ENSURE_REQUIREMENTS, [plan_id=55596]
+
+(9) Sort
+Input [5]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, trips_per_day#87381]
+Arguments: [pickup_borough#91 ASC NULLS FIRST, pickup_year_month#70 ASC NULLS FIRST], false, 0
+
+(10) Window
+Input [5]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, trips_per_day#87381]
+Arguments: [lag(trips_per_day#87381, -1, null) windowspecdefinition(pickup_borough#91, pickup_year_month#70 ASC NULLS FIRST, specifiedwindowframe(RowFrame, -1, -1)) AS _we0#87453, lag(trips_per_day#87381, -1, null) windowspecdefinition(pickup_borough#91, pickup_year_month#70 ASC NULLS FIRST, specifiedwindowframe(RowFrame, -1, -1)) AS _we1#87454], [pickup_borough#91], [pickup_year_month#70 ASC NULLS FIRST]
+
+(11) Exchange
+Input [7]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, trips_per_day#87381, _we0#87453, _we1#87454]
+Arguments: hashpartitioning(pickup_year_month#70, 8), ENSURE_REQUIREMENTS, [plan_id=55600]
+
+(12) Sort
+Input [7]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, trips_per_day#87381, _we0#87453, _we1#87454]
+Arguments: [pickup_year_month#70 ASC NULLS FIRST], false, 0
+
+(13) Window
+Input [7]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, trips_per_day#87381, _we0#87453, _we1#87454]
+Arguments: [sum(trip_count#87380L) windowspecdefinition(pickup_year_month#70, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we2#87455L], [pickup_year_month#70]
+
+(14) Project
+Output [6]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, round(((100.0 * (trips_per_day#87381 - _we0#87453)) / _we1#87454), 2) AS mom_change_pct#87378, round(((100.0 * cast(trip_count#87380L as decimal(20,0))) / cast(_we2#87455L as decimal(20,0))), 2) AS pct_of_city#87379]
+Input [8]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, trips_per_day#87381, _we0#87453, _we1#87454, _we2#87455L]
+
+(15) Exchange
+Input [6]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, mom_change_pct#87378, pct_of_city#87379]
+Arguments: rangepartitioning(pickup_borough#91 ASC NULLS FIRST, pickup_year_month#70 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=55605]
+
+(16) Sort
+Input [6]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, mom_change_pct#87378, pct_of_city#87379]
+Arguments: [pickup_borough#91 ASC NULLS FIRST, pickup_year_month#70 ASC NULLS FIRST], true, 0
+
+(17) AdaptiveSparkPlan
+Output [6]: [pickup_year_month#70, pickup_borough#91, trip_count#87380L, trips_per_day#87377, mom_change_pct#87378, pct_of_city#87379]
+Arguments: isFinalPlan=false
+
+

@@ -18,74 +18,74 @@ AdaptiveSparkPlan (14)
 
 
 (1) Scan parquet 
-Output [4]: [pickup_hour#106, aq_pm25_ugm3#142, air_quality_is_missing#146, pickup_year_month#126]
+Output [4]: [pickup_hour#50, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
 Batched: true
-Location: PreparedDeltaFileIndex [file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
 PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))]
 ReadSchema: struct<pickup_hour:timestamp,aq_pm25_ugm3:double,air_quality_is_missing:boolean>
 
 (2) Filter
-Input [4]: [pickup_hour#106, aq_pm25_ugm3#142, air_quality_is_missing#146, pickup_year_month#126]
-Condition : (isnotnull(air_quality_is_missing#146) AND NOT air_quality_is_missing#146)
+Input [4]: [pickup_hour#50, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+Condition : (isnotnull(air_quality_is_missing#90) AND NOT air_quality_is_missing#90)
 
 (3) Project
-Output [2]: [pickup_hour#106, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#142 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#142 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#142 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19190]
-Input [4]: [pickup_hour#106, aq_pm25_ugm3#142, air_quality_is_missing#146, pickup_year_month#126]
+Output [2]: [pickup_hour#50, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#86 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#86 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#86 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19321]
+Input [4]: [pickup_hour#50, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
 
 (4) Sort
-Input [2]: [pickup_hour#106, aq_epa_category#19190]
-Arguments: [pickup_hour#106 ASC NULLS FIRST], false, 0
+Input [2]: [pickup_hour#50, aq_epa_category#19321]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
 
 (5) SortAggregate
-Input [2]: [pickup_hour#106, aq_epa_category#19190]
-Keys [1]: [pickup_hour#106]
-Functions [2]: [partial_count(1), partial_max(aq_epa_category#19190)]
-Aggregate Attributes [2]: [count#19285L, max#19286]
-Results [3]: [pickup_hour#106, count#19287L, max#19288]
+Input [2]: [pickup_hour#50, aq_epa_category#19321]
+Keys [1]: [pickup_hour#50]
+Functions [2]: [partial_count(1), partial_max(aq_epa_category#19321)]
+Aggregate Attributes [2]: [count#19416L, max#19417]
+Results [3]: [pickup_hour#50, count#19418L, max#19419]
 
 (6) Exchange
-Input [3]: [pickup_hour#106, count#19287L, max#19288]
-Arguments: hashpartitioning(pickup_hour#106, 8), ENSURE_REQUIREMENTS, [plan_id=10479]
+Input [3]: [pickup_hour#50, count#19418L, max#19419]
+Arguments: hashpartitioning(pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=10469]
 
 (7) Sort
-Input [3]: [pickup_hour#106, count#19287L, max#19288]
-Arguments: [pickup_hour#106 ASC NULLS FIRST], false, 0
+Input [3]: [pickup_hour#50, count#19418L, max#19419]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
 
 (8) SortAggregate
-Input [3]: [pickup_hour#106, count#19287L, max#19288]
-Keys [1]: [pickup_hour#106]
-Functions [2]: [count(1), max(aq_epa_category#19190)]
-Aggregate Attributes [2]: [count(1)#19191L, max(aq_epa_category#19190)#19197]
-Results [2]: [count(1)#19191L AS trip_count#19120L, max(aq_epa_category#19190)#19197 AS aq_epa_category#19126]
+Input [3]: [pickup_hour#50, count#19418L, max#19419]
+Keys [1]: [pickup_hour#50]
+Functions [2]: [count(1), max(aq_epa_category#19321)]
+Aggregate Attributes [2]: [count(1)#19322L, max(aq_epa_category#19321)#19328]
+Results [2]: [count(1)#19322L AS trip_count#19251L, max(aq_epa_category#19321)#19328 AS aq_epa_category#19257]
 
 (9) HashAggregate
-Input [2]: [trip_count#19120L, aq_epa_category#19126]
-Keys [1]: [aq_epa_category#19126]
-Functions [2]: [partial_count(1), partial_avg(trip_count#19120L)]
-Aggregate Attributes [3]: [count#19279L, sum#19280, count#19281L]
-Results [4]: [aq_epa_category#19126, count#19282L, sum#19283, count#19284L]
+Input [2]: [trip_count#19251L, aq_epa_category#19257]
+Keys [1]: [aq_epa_category#19257]
+Functions [2]: [partial_count(1), partial_avg(trip_count#19251L)]
+Aggregate Attributes [3]: [count#19410L, sum#19411, count#19412L]
+Results [4]: [aq_epa_category#19257, count#19413L, sum#19414, count#19415L]
 
 (10) Exchange
-Input [4]: [aq_epa_category#19126, count#19282L, sum#19283, count#19284L]
-Arguments: hashpartitioning(aq_epa_category#19126, 8), ENSURE_REQUIREMENTS, [plan_id=10484]
+Input [4]: [aq_epa_category#19257, count#19413L, sum#19414, count#19415L]
+Arguments: hashpartitioning(aq_epa_category#19257, 8), ENSURE_REQUIREMENTS, [plan_id=10474]
 
 (11) HashAggregate
-Input [4]: [aq_epa_category#19126, count#19282L, sum#19283, count#19284L]
-Keys [1]: [aq_epa_category#19126]
-Functions [2]: [count(1), avg(trip_count#19120L)]
-Aggregate Attributes [2]: [count(1)#19200L, avg(trip_count#19120L)#19201]
-Results [3]: [aq_epa_category#19126, count(1)#19200L AS hours#19104L, round(avg(trip_count#19120L)#19201, 1) AS avg_trips_per_hour#19105]
+Input [4]: [aq_epa_category#19257, count#19413L, sum#19414, count#19415L]
+Keys [1]: [aq_epa_category#19257]
+Functions [2]: [count(1), avg(trip_count#19251L)]
+Aggregate Attributes [2]: [count(1)#19331L, avg(trip_count#19251L)#19332]
+Results [3]: [aq_epa_category#19257, count(1)#19331L AS hours#19235L, round(avg(trip_count#19251L)#19332, 1) AS avg_trips_per_hour#19236]
 
 (12) Exchange
-Input [3]: [aq_epa_category#19126, hours#19104L, avg_trips_per_hour#19105]
-Arguments: rangepartitioning(hours#19104L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=10487]
+Input [3]: [aq_epa_category#19257, hours#19235L, avg_trips_per_hour#19236]
+Arguments: rangepartitioning(hours#19235L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=10477]
 
 (13) Sort
-Input [3]: [aq_epa_category#19126, hours#19104L, avg_trips_per_hour#19105]
-Arguments: [hours#19104L DESC NULLS LAST], true, 0
+Input [3]: [aq_epa_category#19257, hours#19235L, avg_trips_per_hour#19236]
+Arguments: [hours#19235L DESC NULLS LAST], true, 0
 
 (14) AdaptiveSparkPlan
-Output [3]: [aq_epa_category#19126, hours#19104L, avg_trips_per_hour#19105]
+Output [3]: [aq_epa_category#19257, hours#19235L, avg_trips_per_hour#19236]
 Arguments: isFinalPlan=false
 
 

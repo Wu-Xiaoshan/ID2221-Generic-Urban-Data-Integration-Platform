@@ -1,0 +1,28 @@
+# aqe_q1_zone_monthly_demand / AQE off
+
+*(9) Sort [pickup_year_month#70 ASC NULLS FIRST, rank_in_month#42121 ASC NULLS FIRST], true, 0
++- Exchange rangepartitioning(pickup_year_month#70 ASC NULLS FIRST, rank_in_month#42121 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=27381]
+   +- *(8) Project [pickup_year_month#70, pu_location_id#42115, pickup_zone#42116, pickup_borough#42117, trip_count#42125L, dropoff_count#42118L, trips_per_day#42119, round(((100.0 * cast(trip_count#42125L as decimal(20,0))) / cast(_we0#42314L as decimal(20,0))), 2) AS share_of_borough_pct#42120, rank_in_month#42121]
+      +- Window [sum(trip_count#42125L) windowspecdefinition(pickup_year_month#70, borough#42124, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#42314L], [pickup_year_month#70, borough#42124]
+         +- *(7) Sort [pickup_year_month#70 ASC NULLS FIRST, borough#42124 ASC NULLS FIRST], false, 0
+            +- Window [rank(trip_count#42125L) windowspecdefinition(pickup_year_month#70, trip_count#42125L DESC NULLS LAST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rank_in_month#42121], [pickup_year_month#70], [trip_count#42125L DESC NULLS LAST]
+               +- *(6) Sort [pickup_year_month#70 ASC NULLS FIRST, trip_count#42125L DESC NULLS LAST], false, 0
+                  +- Exchange hashpartitioning(pickup_year_month#70, 8), ENSURE_REQUIREMENTS, [plan_id=27369]
+                     +- *(5) Project [pickup_year_month#70, location_id#42122 AS pu_location_id#42115, zone#42123 AS pickup_zone#42116, borough#42124 AS pickup_borough#42117, trip_count#42125L, coalesce(dropoff_count#42127L, 0) AS dropoff_count#42118L, round((cast(trip_count#42125L as double) / cast(day(last_day(cast(concat(pickup_year_month#70, -01) as date))) as double)), 1) AS trips_per_day#42119, borough#42124]
+                        +- *(5) SortMergeJoin [pickup_year_month#70, location_id#42122], [pickup_year_month#42276, location_id#42126], LeftOuter
+                           :- SortAggregate(key=[pickup_year_month#70, pu_location_id#49], functions=[max(pickup_zone#92), max(pickup_borough#91), count(1)], output=[pickup_year_month#70, location_id#42122, zone#42123, borough#42124, trip_count#42125L])
+                           :  +- *(2) Sort [pickup_year_month#70 ASC NULLS FIRST, pu_location_id#49 ASC NULLS FIRST], false, 0
+                           :     +- Exchange hashpartitioning(pickup_year_month#70, pu_location_id#49, 8), ENSURE_REQUIREMENTS, [plan_id=27349]
+                           :        +- SortAggregate(key=[pickup_year_month#70, pu_location_id#49], functions=[partial_max(pickup_zone#92), partial_max(pickup_borough#91), partial_count(1)], output=[pickup_year_month#70, pu_location_id#49, max#42483, max#42484, count#42485L])
+                           :           +- *(1) Sort [pickup_year_month#70 ASC NULLS FIRST, pu_location_id#49 ASC NULLS FIRST], false, 0
+                           :              +- *(1) Filter NOT pu_location_id#49 IN (264,265)
+                           :                 +- *(1) ColumnarToRow
+                           :                    +- FileScan parquet [pu_location_id#49,pickup_borough#91,pickup_zone#92,pickup_year_month#70] Batched: true, DataFilters: [NOT pu_location_id#49 IN (264,265)], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [Not(In(pu_location_id, [264,265]))], ReadSchema: struct<pu_location_id:int,pickup_borough:string,pickup_zone:string>
+                           +- *(4) Sort [pickup_year_month#42276 ASC NULLS FIRST, location_id#42126 ASC NULLS FIRST], false, 0
+                              +- *(4) HashAggregate(keys=[pickup_year_month#42276, do_location_id#42254], functions=[count(1)], output=[pickup_year_month#42276, location_id#42126, dropoff_count#42127L])
+                                 +- Exchange hashpartitioning(pickup_year_month#42276, do_location_id#42254, 8), ENSURE_REQUIREMENTS, [plan_id=27360]
+                                    +- *(3) HashAggregate(keys=[pickup_year_month#42276, do_location_id#42254], functions=[partial_count(1)], output=[pickup_year_month#42276, do_location_id#42254, count#42487L])
+                                       +- *(3) Filter (NOT do_location_id#42254 IN (264,265) AND isnotnull(do_location_id#42254))
+                                          +- *(3) ColumnarToRow
+                                             +- FileScan parquet [do_location_id#42254,pickup_year_month#42276] Batched: true, DataFilters: [NOT do_location_id#42254 IN (264,265), isnotnull(do_location_id#42254)], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [isnotnull(pickup_year_month#42276), dynamicpruningexpression(true)], PushedFilters: [Not(In(do_location_id, [264,265])), IsNotNull(do_location_id)], ReadSchema: struct<do_location_id:int>
+

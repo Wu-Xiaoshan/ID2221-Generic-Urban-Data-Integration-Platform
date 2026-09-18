@@ -1,0 +1,63 @@
+# aqe_q6_daily_trend / AQE off
+
+== Physical Plan ==
+* Project (10)
++- Window (9)
+   +- * Sort (8)
+      +- Exchange (7)
+         +- * HashAggregate (6)
+            +- Exchange (5)
+               +- * HashAggregate (4)
+                  +- * Project (3)
+                     +- * ColumnarToRow (2)
+                        +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [2]: [pickup_date#69, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+ReadSchema: struct<pickup_date:date>
+
+(2) ColumnarToRow [codegen id : 1]
+Input [2]: [pickup_date#69, pickup_year_month#70]
+
+(3) Project [codegen id : 1]
+Output [1]: [pickup_date#69]
+Input [2]: [pickup_date#69, pickup_year_month#70]
+
+(4) HashAggregate [codegen id : 1]
+Input [1]: [pickup_date#69]
+Keys [1]: [pickup_date#69]
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#89590L]
+Results [2]: [pickup_date#69, count#89591L]
+
+(5) Exchange
+Input [2]: [pickup_date#69, count#89591L]
+Arguments: hashpartitioning(pickup_date#69, 8), ENSURE_REQUIREMENTS, [plan_id=57531]
+
+(6) HashAggregate [codegen id : 2]
+Input [2]: [pickup_date#69, count#89591L]
+Keys [1]: [pickup_date#69]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#89481L]
+Results [2]: [pickup_date#69, count(1)#89481L AS trip_count#89412L]
+
+(7) Exchange
+Input [2]: [pickup_date#69, trip_count#89412L]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=57535]
+
+(8) Sort [codegen id : 3]
+Input [2]: [pickup_date#69, trip_count#89412L]
+Arguments: [pickup_date#69 ASC NULLS FIRST], false, 0
+
+(9) Window
+Input [2]: [pickup_date#69, trip_count#89412L]
+Arguments: [avg(trip_count#89412L) windowspecdefinition(pickup_date#69 ASC NULLS FIRST, specifiedwindowframe(RowFrame, -6, currentrow$())) AS _we0#89483], [pickup_date#69 ASC NULLS FIRST]
+
+(10) Project [codegen id : 4]
+Output [3]: [pickup_date#69, trip_count#89412L, round(_we0#89483, 1) AS ma7#89411]
+Input [3]: [pickup_date#69, trip_count#89412L, _we0#89483]
+
+

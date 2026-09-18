@@ -1,0 +1,18 @@
+# product_hourly_air_quality_demand / recompute from hourly_air_quality_demand
+
+AdaptiveSparkPlan isFinalPlan=true
++- == Final Plan ==
+   *(2) HashAggregate(keys=[], functions=[corr(cast(trip_count#681L as double), pm25_ugm3#683), corr(demand_index#682, pm25_ugm3#683)], output=[corr_raw#102759, corr_controlled#102760])
+   +- ShuffleQueryStage 0
+      +- Exchange SinglePartition, ENSURE_REQUIREMENTS, [plan_id=65868]
+         +- *(1) HashAggregate(keys=[], functions=[partial_corr(cast(trip_count#681L as double), pm25_ugm3#683), partial_corr(demand_index#682, pm25_ugm3#683)], output=[n#102805, xAvg#102806, yAvg#102807, ck#102808, xMk#102809, yMk#102810, n#102780, xAvg#102781, yAvg#102782, ck#102783, xMk#102784, yMk#102785])
+            +- *(1) Project [trip_count#681L, demand_index#682, pm25_ugm3#683]
+               +- *(1) ColumnarToRow
+                  +- FileScan parquet [trip_count#681L,demand_index#682,pm25_ugm3#683,pickup_year_month#676] Batched: true, DataFilters: [], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<trip_count:bigint,demand_index:double,pm25_ugm3:double>
++- == Initial Plan ==
+   HashAggregate(keys=[], functions=[corr(cast(trip_count#681L as double), pm25_ugm3#683), corr(demand_index#682, pm25_ugm3#683)], output=[corr_raw#102759, corr_controlled#102760])
+   +- Exchange SinglePartition, ENSURE_REQUIREMENTS, [plan_id=65851]
+      +- HashAggregate(keys=[], functions=[partial_corr(cast(trip_count#681L as double), pm25_ugm3#683), partial_corr(demand_index#682, pm25_ugm3#683)], output=[n#102805, xAvg#102806, yAvg#102807, ck#102808, xMk#102809, yMk#102810, n#102780, xAvg#102781, yAvg#102782, ck#102783, xMk#102784, yMk#102785])
+         +- Project [trip_count#681L, demand_index#682, pm25_ugm3#683]
+            +- FileScan parquet [trip_count#681L,demand_index#682,pm25_ugm3#683,pickup_year_month#676] Batched: true, DataFilters: [], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<trip_count:bigint,demand_index:double,pm25_ugm3:double>
+

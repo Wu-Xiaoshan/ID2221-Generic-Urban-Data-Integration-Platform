@@ -1,0 +1,90 @@
+# aqe_q3_aq_epa_categories / AQE off
+
+== Physical Plan ==
+* Sort (14)
++- Exchange (13)
+   +- * HashAggregate (12)
+      +- Exchange (11)
+         +- * HashAggregate (10)
+            +- SortAggregate (9)
+               +- * Sort (8)
+                  +- Exchange (7)
+                     +- SortAggregate (6)
+                        +- * Sort (5)
+                           +- * Project (4)
+                              +- * Filter (3)
+                                 +- * ColumnarToRow (2)
+                                    +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [4]: [pickup_hour#50, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))]
+ReadSchema: struct<pickup_hour:timestamp,aq_pm25_ugm3:double,air_quality_is_missing:boolean>
+
+(2) ColumnarToRow [codegen id : 1]
+Input [4]: [pickup_hour#50, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+
+(3) Filter [codegen id : 1]
+Input [4]: [pickup_hour#50, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+Condition : (isnotnull(air_quality_is_missing#90) AND NOT air_quality_is_missing#90)
+
+(4) Project [codegen id : 1]
+Output [2]: [pickup_hour#50, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#86 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#86 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#86 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#73353]
+Input [4]: [pickup_hour#50, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+
+(5) Sort [codegen id : 1]
+Input [2]: [pickup_hour#50, aq_epa_category#73353]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
+
+(6) SortAggregate
+Input [2]: [pickup_hour#50, aq_epa_category#73353]
+Keys [1]: [pickup_hour#50]
+Functions [2]: [partial_count(1), partial_max(aq_epa_category#73353)]
+Aggregate Attributes [2]: [count#73448L, max#73449]
+Results [3]: [pickup_hour#50, count#73450L, max#73451]
+
+(7) Exchange
+Input [3]: [pickup_hour#50, count#73450L, max#73451]
+Arguments: hashpartitioning(pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=43205]
+
+(8) Sort [codegen id : 2]
+Input [3]: [pickup_hour#50, count#73450L, max#73451]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
+
+(9) SortAggregate
+Input [3]: [pickup_hour#50, count#73450L, max#73451]
+Keys [1]: [pickup_hour#50]
+Functions [2]: [count(1), max(aq_epa_category#73353)]
+Aggregate Attributes [2]: [count(1)#73354L, max(aq_epa_category#73353)#73360]
+Results [2]: [count(1)#73354L AS trip_count#73283L, max(aq_epa_category#73353)#73360 AS aq_epa_category#73289]
+
+(10) HashAggregate [codegen id : 3]
+Input [2]: [trip_count#73283L, aq_epa_category#73289]
+Keys [1]: [aq_epa_category#73289]
+Functions [2]: [partial_count(1), partial_avg(trip_count#73283L)]
+Aggregate Attributes [3]: [count#73442L, sum#73443, count#73444L]
+Results [4]: [aq_epa_category#73289, count#73445L, sum#73446, count#73447L]
+
+(11) Exchange
+Input [4]: [aq_epa_category#73289, count#73445L, sum#73446, count#73447L]
+Arguments: hashpartitioning(aq_epa_category#73289, 8), ENSURE_REQUIREMENTS, [plan_id=43213]
+
+(12) HashAggregate [codegen id : 4]
+Input [4]: [aq_epa_category#73289, count#73445L, sum#73446, count#73447L]
+Keys [1]: [aq_epa_category#73289]
+Functions [2]: [count(1), avg(trip_count#73283L)]
+Aggregate Attributes [2]: [count(1)#73363L, avg(trip_count#73283L)#73364]
+Results [3]: [aq_epa_category#73289, count(1)#73363L AS hours#73267L, round(avg(trip_count#73283L)#73364, 1) AS avg_trips_per_hour#73268]
+
+(13) Exchange
+Input [3]: [aq_epa_category#73289, hours#73267L, avg_trips_per_hour#73268]
+Arguments: rangepartitioning(hours#73267L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=43217]
+
+(14) Sort [codegen id : 5]
+Input [3]: [aq_epa_category#73289, hours#73267L, avg_trips_per_hour#73268]
+Arguments: [hours#73267L DESC NULLS LAST], true, 0
+
+

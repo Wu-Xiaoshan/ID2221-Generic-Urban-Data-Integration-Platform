@@ -1,0 +1,17 @@
+# product_zone_monthly_statistics / read zone_monthly_statistics
+
+AdaptiveSparkPlan isFinalPlan=true
++- == Final Plan ==
+   *(2) Sort [pickup_year_month#558 ASC NULLS FIRST, pu_location_id#559 ASC NULLS FIRST], true, 0
+   +- AQEShuffleRead coalesced
+      +- ShuffleQueryStage 0
+         +- Exchange rangepartitioning(pickup_year_month#558 ASC NULLS FIRST, pu_location_id#559 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=59867]
+            +- *(1) Project [pickup_year_month#558, pu_location_id#559, trip_count#562L, dropoff_count#563L]
+               +- *(1) ColumnarToRow
+                  +- FileScan parquet [pu_location_id#559,trip_count#562L,dropoff_count#563L,pickup_year_month#558] Batched: true, DataFilters: [], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<pu_location_id:int,trip_count:bigint,dropoff_count:bigint>
++- == Initial Plan ==
+   Sort [pickup_year_month#558 ASC NULLS FIRST, pu_location_id#559 ASC NULLS FIRST], true, 0
+   +- Exchange rangepartitioning(pickup_year_month#558 ASC NULLS FIRST, pu_location_id#559 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=59853]
+      +- Project [pickup_year_month#558, pu_location_id#559, trip_count#562L, dropoff_count#563L]
+         +- FileScan parquet [pu_location_id#559,trip_count#562L,dropoff_count#563L,pickup_year_month#558] Batched: true, DataFilters: [], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<pu_location_id:int,trip_count:bigint,dropoff_count:bigint>
+

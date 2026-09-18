@@ -1,0 +1,28 @@
+# aqe_q6_daily_trend / AQE on
+
+AdaptiveSparkPlan isFinalPlan=true
++- == Final Plan ==
+   *(4) Project [pickup_date#69, trip_count#90136L, round(_we0#90202, 1) AS ma7#90135]
+   +- Window [avg(trip_count#90136L) windowspecdefinition(pickup_date#69 ASC NULLS FIRST, specifiedwindowframe(RowFrame, -6, currentrow$())) AS _we0#90202], [pickup_date#69 ASC NULLS FIRST]
+      +- *(3) Sort [pickup_date#69 ASC NULLS FIRST], false, 0
+         +- ShuffleQueryStage 1
+            +- Exchange SinglePartition, ENSURE_REQUIREMENTS, [plan_id=58001]
+               +- *(2) HashAggregate(keys=[pickup_date#69], functions=[count(1)], output=[pickup_date#69, trip_count#90136L])
+                  +- AQEShuffleRead coalesced
+                     +- ShuffleQueryStage 0
+                        +- Exchange hashpartitioning(pickup_date#69, 8), ENSURE_REQUIREMENTS, [plan_id=57961]
+                           +- *(1) HashAggregate(keys=[pickup_date#69], functions=[partial_count(1)], output=[pickup_date#69, count#90313L])
+                              +- *(1) Project [pickup_date#69]
+                                 +- *(1) ColumnarToRow
+                                    +- FileScan parquet [pickup_date#69,pickup_year_month#70] Batched: true, DataFilters: [], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<pickup_date:date>
++- == Initial Plan ==
+   Project [pickup_date#69, trip_count#90136L, round(_we0#90202, 1) AS ma7#90135]
+   +- Window [avg(trip_count#90136L) windowspecdefinition(pickup_date#69 ASC NULLS FIRST, specifiedwindowframe(RowFrame, -6, currentrow$())) AS _we0#90202], [pickup_date#69 ASC NULLS FIRST]
+      +- Sort [pickup_date#69 ASC NULLS FIRST], false, 0
+         +- Exchange SinglePartition, ENSURE_REQUIREMENTS, [plan_id=57937]
+            +- HashAggregate(keys=[pickup_date#69], functions=[count(1)], output=[pickup_date#69, trip_count#90136L])
+               +- Exchange hashpartitioning(pickup_date#69, 8), ENSURE_REQUIREMENTS, [plan_id=57934]
+                  +- HashAggregate(keys=[pickup_date#69], functions=[partial_count(1)], output=[pickup_date#69, count#90313L])
+                     +- Project [pickup_date#69]
+                        +- FileScan parquet [pickup_date#69,pickup_year_month#70] Batched: true, DataFilters: [], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<pickup_date:date>
+

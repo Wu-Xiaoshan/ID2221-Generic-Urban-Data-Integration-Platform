@@ -1,0 +1,183 @@
+# aqe_q5_peak_hours / AQE off
+
+== Physical Plan ==
+* Project (31)
++- * Sort (30)
+   +- Exchange (29)
+      +- * Project (28)
+         +- * Filter (27)
+            +- Window (26)
+               +- Window (25)
+                  +- * Sort (24)
+                     +- Exchange (23)
+                        +- * Project (22)
+                           +- * BroadcastHashJoin Inner BuildRight (21)
+                              :- SortAggregate (9)
+                              :  +- * Sort (8)
+                              :     +- Exchange (7)
+                              :        +- SortAggregate (6)
+                              :           +- * Sort (5)
+                              :              +- * Project (4)
+                              :                 +- * Filter (3)
+                              :                    +- * ColumnarToRow (2)
+                              :                       +- Scan parquet  (1)
+                              +- BroadcastExchange (20)
+                                 +- * HashAggregate (19)
+                                    +- Exchange (18)
+                                       +- * HashAggregate (17)
+                                          +- * HashAggregate (16)
+                                             +- Exchange (15)
+                                                +- * HashAggregate (14)
+                                                   +- * Project (13)
+                                                      +- * Filter (12)
+                                                         +- * ColumnarToRow (11)
+                                                            +- Scan parquet  (10)
+
+
+(1) Scan parquet 
+Output [3]: [pickup_ts#82545, pickup_date#82549, pickup_year_month#82550]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+ReadSchema: struct<pickup_ts:timestamp,pickup_date:date>
+
+(2) ColumnarToRow [codegen id : 1]
+Input [3]: [pickup_ts#82545, pickup_date#82549, pickup_year_month#82550]
+
+(3) Filter [codegen id : 1]
+Input [3]: [pickup_ts#82545, pickup_date#82549, pickup_year_month#82550]
+Condition : isnotnull(dayofweek(pickup_date#82549))
+
+(4) Project [codegen id : 1]
+Output [3]: [hour(from_utc_timestamp(pickup_ts#82545, America/New_York), Some(UTC)) AS local_hour#82520, date_format(cast(pickup_date#82549 as timestamp), EEEE, Some(UTC)) AS day_of_week#82521, dayofweek(pickup_date#82549) AS day_of_week_num#82522]
+Input [3]: [pickup_ts#82545, pickup_date#82549, pickup_year_month#82550]
+
+(5) Sort [codegen id : 1]
+Input [3]: [local_hour#82520, day_of_week#82521, day_of_week_num#82522]
+Arguments: [day_of_week_num#82522 ASC NULLS FIRST, local_hour#82520 ASC NULLS FIRST], false, 0
+
+(6) SortAggregate
+Input [3]: [local_hour#82520, day_of_week#82521, day_of_week_num#82522]
+Keys [2]: [day_of_week_num#82522, local_hour#82520]
+Functions [2]: [partial_max(day_of_week#82521), partial_count(1)]
+Aggregate Attributes [2]: [max#82742, count#82743L]
+Results [4]: [day_of_week_num#82522, local_hour#82520, max#82744, count#82745L]
+
+(7) Exchange
+Input [4]: [day_of_week_num#82522, local_hour#82520, max#82744, count#82745L]
+Arguments: hashpartitioning(day_of_week_num#82522, local_hour#82520, 8), ENSURE_REQUIREMENTS, [plan_id=50230]
+
+(8) Sort [codegen id : 2]
+Input [4]: [day_of_week_num#82522, local_hour#82520, max#82744, count#82745L]
+Arguments: [day_of_week_num#82522 ASC NULLS FIRST, local_hour#82520 ASC NULLS FIRST], false, 0
+
+(9) SortAggregate
+Input [4]: [day_of_week_num#82522, local_hour#82520, max#82744, count#82745L]
+Keys [2]: [day_of_week_num#82522, local_hour#82520]
+Functions [2]: [max(day_of_week#82521), count(1)]
+Aggregate Attributes [2]: [max(day_of_week#82521)#82576, count(1)#82577L]
+Results [4]: [day_of_week_num#82522, max(day_of_week#82521)#82576 AS day_of_week#82392, local_hour#82520, count(1)#82577L AS total_trips#82393L]
+
+(10) Scan parquet 
+Output [2]: [pickup_date#69, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+ReadSchema: struct<pickup_date:date>
+
+(11) ColumnarToRow [codegen id : 3]
+Input [2]: [pickup_date#69, pickup_year_month#70]
+
+(12) Filter [codegen id : 3]
+Input [2]: [pickup_date#69, pickup_year_month#70]
+Condition : isnotnull(dayofweek(pickup_date#69))
+
+(13) Project [codegen id : 3]
+Output [2]: [pickup_date#69, dayofweek(pickup_date#69) AS day_of_week_num#82459]
+Input [2]: [pickup_date#69, pickup_year_month#70]
+
+(14) HashAggregate [codegen id : 3]
+Input [2]: [pickup_date#69, day_of_week_num#82459]
+Keys [2]: [day_of_week_num#82459, pickup_date#69]
+Functions: []
+Aggregate Attributes: []
+Results [2]: [day_of_week_num#82459, pickup_date#69]
+
+(15) Exchange
+Input [2]: [day_of_week_num#82459, pickup_date#69]
+Arguments: hashpartitioning(day_of_week_num#82459, pickup_date#69, 8), ENSURE_REQUIREMENTS, [plan_id=50242]
+
+(16) HashAggregate [codegen id : 4]
+Input [2]: [day_of_week_num#82459, pickup_date#69]
+Keys [2]: [day_of_week_num#82459, pickup_date#69]
+Functions: []
+Aggregate Attributes: []
+Results [2]: [day_of_week_num#82459, pickup_date#69]
+
+(17) HashAggregate [codegen id : 4]
+Input [2]: [day_of_week_num#82459, pickup_date#69]
+Keys [1]: [day_of_week_num#82459]
+Functions [1]: [partial_count(distinct pickup_date#69)]
+Aggregate Attributes [1]: [count(pickup_date#69)#82575L]
+Results [2]: [day_of_week_num#82459, count#82748L]
+
+(18) Exchange
+Input [2]: [day_of_week_num#82459, count#82748L]
+Arguments: hashpartitioning(day_of_week_num#82459, 8), ENSURE_REQUIREMENTS, [plan_id=50247]
+
+(19) HashAggregate [codegen id : 5]
+Input [2]: [day_of_week_num#82459, count#82748L]
+Keys [1]: [day_of_week_num#82459]
+Functions [1]: [count(distinct pickup_date#69)]
+Aggregate Attributes [1]: [count(pickup_date#69)#82575L]
+Results [2]: [day_of_week_num#82459, count(pickup_date#69)#82575L AS occurrences#82391L]
+
+(20) BroadcastExchange
+Input [2]: [day_of_week_num#82459, occurrences#82391L]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=50251]
+
+(21) BroadcastHashJoin [codegen id : 6]
+Left keys [1]: [day_of_week_num#82522]
+Right keys [1]: [day_of_week_num#82459]
+Join type: Inner
+Join condition: None
+
+(22) Project [codegen id : 6]
+Output [5]: [day_of_week_num#82522, day_of_week#82392, local_hour#82520, total_trips#82393L, round((cast(total_trips#82393L as double) / cast(occurrences#82391L as double)), 1) AS avg_trips_per_occurrence#82394]
+Input [6]: [day_of_week_num#82522, day_of_week#82392, local_hour#82520, total_trips#82393L, day_of_week_num#82459, occurrences#82391L]
+
+(23) Exchange
+Input [5]: [day_of_week_num#82522, day_of_week#82392, local_hour#82520, total_trips#82393L, avg_trips_per_occurrence#82394]
+Arguments: hashpartitioning(day_of_week_num#82522, 8), ENSURE_REQUIREMENTS, [plan_id=50256]
+
+(24) Sort [codegen id : 7]
+Input [5]: [day_of_week_num#82522, day_of_week#82392, local_hour#82520, total_trips#82393L, avg_trips_per_occurrence#82394]
+Arguments: [day_of_week_num#82522 ASC NULLS FIRST, total_trips#82393L DESC NULLS LAST], false, 0
+
+(25) Window
+Input [5]: [day_of_week_num#82522, day_of_week#82392, local_hour#82520, total_trips#82393L, avg_trips_per_occurrence#82394]
+Arguments: [rank(total_trips#82393L) windowspecdefinition(day_of_week_num#82522, total_trips#82393L DESC NULLS LAST, specifiedwindowframe(RowFrame, unboundedpreceding$(), currentrow$())) AS rank_in_day#82395], [day_of_week_num#82522], [total_trips#82393L DESC NULLS LAST]
+
+(26) Window
+Input [6]: [day_of_week_num#82522, day_of_week#82392, local_hour#82520, total_trips#82393L, avg_trips_per_occurrence#82394, rank_in_day#82395]
+Arguments: [sum(total_trips#82393L) windowspecdefinition(day_of_week_num#82522, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we1#82587L], [day_of_week_num#82522]
+
+(27) Filter [codegen id : 8]
+Input [7]: [day_of_week_num#82522, day_of_week#82392, local_hour#82520, total_trips#82393L, avg_trips_per_occurrence#82394, rank_in_day#82395, _we1#82587L]
+Condition : (rank_in_day#82395 <= 3)
+
+(28) Project [codegen id : 8]
+Output [7]: [day_of_week#82392, local_hour#82520, avg_trips_per_occurrence#82394, total_trips#82393L, rank_in_day#82395, round(((100.0 * cast(total_trips#82393L as decimal(20,0))) / cast(_we1#82587L as decimal(20,0))), 2) AS pct_of_day_total#82396, day_of_week_num#82522]
+Input [7]: [day_of_week_num#82522, day_of_week#82392, local_hour#82520, total_trips#82393L, avg_trips_per_occurrence#82394, rank_in_day#82395, _we1#82587L]
+
+(29) Exchange
+Input [7]: [day_of_week#82392, local_hour#82520, avg_trips_per_occurrence#82394, total_trips#82393L, rank_in_day#82395, pct_of_day_total#82396, day_of_week_num#82522]
+Arguments: rangepartitioning(day_of_week_num#82522 ASC NULLS FIRST, rank_in_day#82395 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=50266]
+
+(30) Sort [codegen id : 9]
+Input [7]: [day_of_week#82392, local_hour#82520, avg_trips_per_occurrence#82394, total_trips#82393L, rank_in_day#82395, pct_of_day_total#82396, day_of_week_num#82522]
+Arguments: [day_of_week_num#82522 ASC NULLS FIRST, rank_in_day#82395 ASC NULLS FIRST], true, 0
+
+(31) Project [codegen id : 9]
+Output [6]: [day_of_week#82392, local_hour#82520, avg_trips_per_occurrence#82394, total_trips#82393L, rank_in_day#82395, pct_of_day_total#82396]
+Input [7]: [day_of_week#82392, local_hour#82520, avg_trips_per_occurrence#82394, total_trips#82393L, rank_in_day#82395, pct_of_day_total#82396, day_of_week_num#82522]
+
+

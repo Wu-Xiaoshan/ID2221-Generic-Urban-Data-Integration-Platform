@@ -82,8 +82,12 @@ failure.
 ```bash
 python jobs/run_query_benchmark.py                 # the seven experiments
 python jobs/run_query_benchmark.py --sweep         # plus AQE on/off across every query
+python jobs/run_query_benchmark.py --products      # plus each product against recomputing it
 python jobs/run_query_benchmark.py --only caching --repeats 5
 ```
+
+`--products` needs `jobs/run_products.py` to have run. The numbers in the Week 2 benchmark report
+come from one run of `--sweep --products`, so that is the command to reproduce them.
 
 Each experiment is a pair of variants that differ in exactly one thing (a predicate that can prune, a
 join hint, a cached intermediate, a session setting) and that must return the same answer. The

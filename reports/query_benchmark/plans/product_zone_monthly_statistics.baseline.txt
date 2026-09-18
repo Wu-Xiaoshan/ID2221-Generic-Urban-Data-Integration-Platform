@@ -1,0 +1,157 @@
+# product_zone_monthly_statistics / compute Q1 from the gold table
+
+== Physical Plan ==
+AdaptiveSparkPlan (17)
++- Sort (16)
+   +- Exchange (15)
+      +- Project (14)
+         +- SortMergeJoin LeftOuter (13)
+            :- Sort (6)
+            :  +- HashAggregate (5)
+            :     +- Exchange (4)
+            :        +- HashAggregate (3)
+            :           +- Filter (2)
+            :              +- Scan parquet  (1)
+            +- Sort (12)
+               +- HashAggregate (11)
+                  +- Exchange (10)
+                     +- HashAggregate (9)
+                        +- Filter (8)
+                           +- Scan parquet  (7)
+
+
+(1) Scan parquet 
+Output [2]: [pu_location_id#49, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [Not(In(pu_location_id, [264,265]))]
+ReadSchema: struct<pu_location_id:int>
+
+(2) Filter
+Input [2]: [pu_location_id#49, pickup_year_month#70]
+Condition : NOT pu_location_id#49 IN (264,265)
+
+(3) HashAggregate
+Input [2]: [pu_location_id#49, pickup_year_month#70]
+Keys [2]: [pickup_year_month#70, pu_location_id#49]
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#92205L]
+Results [3]: [pickup_year_month#70, pu_location_id#49, count#92206L]
+
+(4) Exchange
+Input [3]: [pickup_year_month#70, pu_location_id#49, count#92206L]
+Arguments: hashpartitioning(pickup_year_month#70, pu_location_id#49, 8), ENSURE_REQUIREMENTS, [plan_id=59231]
+
+(5) HashAggregate
+Input [3]: [pickup_year_month#70, pu_location_id#49, count#92206L]
+Keys [2]: [pickup_year_month#70, pu_location_id#49]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#92037L]
+Results [3]: [pickup_year_month#70, pu_location_id#49 AS location_id#91851, count(1)#92037L AS trip_count#91854L]
+
+(6) Sort
+Input [3]: [pickup_year_month#70, location_id#91851, trip_count#91854L]
+Arguments: [pickup_year_month#70 ASC NULLS FIRST, location_id#91851 ASC NULLS FIRST], false, 0
+
+(7) Scan parquet 
+Output [2]: [do_location_id#91988, pickup_year_month#92010]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PartitionFilters: [isnotnull(pickup_year_month#92010), dynamicpruningexpression(pickup_year_month#92010 IN dynamicpruning#92204)]
+PushedFilters: [Not(In(do_location_id, [264,265])), IsNotNull(do_location_id)]
+ReadSchema: struct<do_location_id:int>
+
+(8) Filter
+Input [2]: [do_location_id#91988, pickup_year_month#92010]
+Condition : (NOT do_location_id#91988 IN (264,265) AND isnotnull(do_location_id#91988))
+
+(9) HashAggregate
+Input [2]: [do_location_id#91988, pickup_year_month#92010]
+Keys [2]: [pickup_year_month#92010, do_location_id#91988]
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#92207L]
+Results [3]: [pickup_year_month#92010, do_location_id#91988, count#92208L]
+
+(10) Exchange
+Input [3]: [pickup_year_month#92010, do_location_id#91988, count#92208L]
+Arguments: hashpartitioning(pickup_year_month#92010, do_location_id#91988, 8), ENSURE_REQUIREMENTS, [plan_id=59233]
+
+(11) HashAggregate
+Input [3]: [pickup_year_month#92010, do_location_id#91988, count#92208L]
+Keys [2]: [pickup_year_month#92010, do_location_id#91988]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#92038L]
+Results [3]: [pickup_year_month#92010, do_location_id#91988 AS location_id#91855, count(1)#92038L AS dropoff_count#91856L]
+
+(12) Sort
+Input [3]: [pickup_year_month#92010, location_id#91855, dropoff_count#91856L]
+Arguments: [pickup_year_month#92010 ASC NULLS FIRST, location_id#91855 ASC NULLS FIRST], false, 0
+
+(13) SortMergeJoin
+Left keys [2]: [pickup_year_month#70, location_id#91851]
+Right keys [2]: [pickup_year_month#92010, location_id#91855]
+Join type: LeftOuter
+Join condition: None
+
+(14) Project
+Output [4]: [pickup_year_month#70, location_id#91851 AS pu_location_id#91844, trip_count#91854L, coalesce(dropoff_count#91856L, 0) AS dropoff_count#91847L]
+Input [6]: [pickup_year_month#70, location_id#91851, trip_count#91854L, pickup_year_month#92010, location_id#91855, dropoff_count#91856L]
+
+(15) Exchange
+Input [4]: [pickup_year_month#70, pu_location_id#91844, trip_count#91854L, dropoff_count#91847L]
+Arguments: rangepartitioning(pickup_year_month#70 ASC NULLS FIRST, pu_location_id#91844 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=59242]
+
+(16) Sort
+Input [4]: [pickup_year_month#70, pu_location_id#91844, trip_count#91854L, dropoff_count#91847L]
+Arguments: [pickup_year_month#70 ASC NULLS FIRST, pu_location_id#91844 ASC NULLS FIRST], true, 0
+
+(17) AdaptiveSparkPlan
+Output [4]: [pickup_year_month#70, pu_location_id#91844, trip_count#91854L, dropoff_count#91847L]
+Arguments: isFinalPlan=false
+
+===== Subqueries =====
+
+Subquery:1 Hosting operator id = 7 Hosting Expression = pickup_year_month#92010 IN dynamicpruning#92204
+AdaptiveSparkPlan (23)
++- HashAggregate (22)
+   +- Exchange (21)
+      +- HashAggregate (20)
+         +- Filter (19)
+            +- Scan parquet  (18)
+
+
+(18) Scan parquet 
+Output [2]: [pu_location_id#49, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [Not(In(pu_location_id, [264,265]))]
+ReadSchema: struct<pu_location_id:int>
+
+(19) Filter
+Input [2]: [pu_location_id#49, pickup_year_month#70]
+Condition : NOT pu_location_id#49 IN (264,265)
+
+(20) HashAggregate
+Input [2]: [pu_location_id#49, pickup_year_month#70]
+Keys [2]: [pickup_year_month#70, pu_location_id#49]
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#92205L]
+Results [3]: [pickup_year_month#70, pu_location_id#49, count#92206L]
+
+(21) Exchange
+Input [3]: [pickup_year_month#70, pu_location_id#49, count#92206L]
+Arguments: hashpartitioning(pickup_year_month#70, pu_location_id#49, 8), ENSURE_REQUIREMENTS, [plan_id=59212]
+
+(22) HashAggregate
+Input [3]: [pickup_year_month#70, pu_location_id#49, count#92206L]
+Keys [2]: [pickup_year_month#70, pu_location_id#49]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#92037L]
+Results [3]: [pickup_year_month#70, pu_location_id#49 AS location_id#91851, count(1)#92037L AS trip_count#91854L]
+
+(23) AdaptiveSparkPlan
+Output [3]: [pickup_year_month#70, location_id#91851, trip_count#91854L]
+Arguments: isFinalPlan=false
+
+
+

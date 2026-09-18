@@ -1,0 +1,27 @@
+# product_weather_impact_summary / recompute from weather_impact_summary
+
+AdaptiveSparkPlan isFinalPlan=true
++- == Final Plan ==
+   *(3) Sort [pu_location_id#618 ASC NULLS FIRST], true, 0
+   +- AQEShuffleRead coalesced
+      +- ShuffleQueryStage 1
+         +- Exchange rangepartitioning(pu_location_id#618 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=62841]
+            +- *(2) Project [pu_location_id#618, coef_of_variation#97904]
+               +- *(2) Filter (isnotnull(sum(trip_count#623L)#97926L) AND ((count(1)#97925L >= 4) AND (sum(trip_count#623L)#97926L >= 10000)))
+                  +- *(2) HashAggregate(keys=[pu_location_id#618], functions=[stddev_samp(trips_per_hour#624), avg(trips_per_hour#624), count(1), sum(trip_count#623L)], output=[pu_location_id#618, coef_of_variation#97904, count(1)#97925L, sum(trip_count#623L)#97926L])
+                     +- AQEShuffleRead coalesced
+                        +- ShuffleQueryStage 0
+                           +- Exchange hashpartitioning(pu_location_id#618, 8), ENSURE_REQUIREMENTS, [plan_id=62797]
+                              +- *(1) HashAggregate(keys=[pu_location_id#618], functions=[partial_stddev_samp(trips_per_hour#624), partial_avg(trips_per_hour#624), partial_count(1), partial_sum(trip_count#623L)], output=[pu_location_id#618, n#97910, avg#97911, m2#97912, sum#98039, count#98040L, count#98041L, sum#98042L])
+                                 +- *(1) ColumnarToRow
+                                    +- FileScan parquet [pu_location_id#618,trip_count#623L,trips_per_hour#624] Batched: true, DataFilters: [], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<pu_location_id:int,trip_count:bigint,trips_per_hour:double>
++- == Initial Plan ==
+   Sort [pu_location_id#618 ASC NULLS FIRST], true, 0
+   +- Exchange rangepartitioning(pu_location_id#618 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=62775]
+      +- Project [pu_location_id#618, coef_of_variation#97904]
+         +- Filter (isnotnull(sum(trip_count#623L)#97926L) AND ((count(1)#97925L >= 4) AND (sum(trip_count#623L)#97926L >= 10000)))
+            +- HashAggregate(keys=[pu_location_id#618], functions=[stddev_samp(trips_per_hour#624), avg(trips_per_hour#624), count(1), sum(trip_count#623L)], output=[pu_location_id#618, coef_of_variation#97904, count(1)#97925L, sum(trip_count#623L)#97926L])
+               +- Exchange hashpartitioning(pu_location_id#618, 8), ENSURE_REQUIREMENTS, [plan_id=62770]
+                  +- HashAggregate(keys=[pu_location_id#618], functions=[partial_stddev_samp(trips_per_hour#624), partial_avg(trips_per_hour#624), partial_count(1), partial_sum(trip_count#623L)], output=[pu_location_id#618, n#97910, avg#97911, m2#97912, sum#98039, count#98040L, count#98041L, sum#98042L])
+                     +- FileScan parquet [pu_location_id#618,trip_count#623L,trips_per_hour#624] Batched: true, DataFilters: [], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [], ReadSchema: struct<pu_location_id:int,trip_count:bigint,trips_per_hour:double>
+

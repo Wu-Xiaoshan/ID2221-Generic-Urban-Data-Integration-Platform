@@ -43,197 +43,197 @@ AdaptiveSparkPlan (36)
 
 
 (1) InMemoryTableScan
-Output [2]: [trip_count#19495L, aq_epa_category#19501]
-Arguments: [trip_count#19495L, aq_epa_category#19501]
+Output [2]: [trip_count#19626L, aq_epa_category#19632]
+Arguments: [trip_count#19626L, aq_epa_category#19632]
 
 (2) InMemoryRelation
-Arguments: [pickup_hour#19494, trip_count#19495L, pm25#19496, pm25_max#19497, local_hour#19498, day_type#19499, aq_quartile#19500, aq_epa_category#19501, demand_index#19502], CachedRDDBuilder(org.apache.spark.sql.execution.columnar.DefaultCachedBatchSerializer@18abdf69,StorageLevel(disk, memory, deserialized, 1 replicas),AdaptiveSparkPlan isFinalPlan=true
+Arguments: [pickup_hour#19625, trip_count#19626L, pm25#19627, pm25_max#19628, local_hour#19629, day_type#19630, aq_quartile#19631, aq_epa_category#19632, demand_index#19633], CachedRDDBuilder(org.apache.spark.sql.execution.columnar.DefaultCachedBatchSerializer@5c8e5b2,StorageLevel(disk, memory, deserialized, 1 replicas),AdaptiveSparkPlan isFinalPlan=true
 +- == Final Plan ==
-   *(4) Project [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493, (cast(trip_count#19487L as double) / _we0#19574) AS demand_index#19502]
-   +- Window [avg(trip_count#19487L) windowspecdefinition(local_hour#19490, day_type#19491, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#19574], [local_hour#19490, day_type#19491]
-      +- *(3) Sort [local_hour#19490 ASC NULLS FIRST, day_type#19491 ASC NULLS FIRST], false, 0
+   *(4) Project [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624, (cast(trip_count#19618L as double) / _we0#19705) AS demand_index#19633]
+   +- Window [avg(trip_count#19618L) windowspecdefinition(local_hour#19621, day_type#19622, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#19705], [local_hour#19621, day_type#19622]
+      +- *(3) Sort [local_hour#19621 ASC NULLS FIRST, day_type#19622 ASC NULLS FIRST], false, 0
          +- ShuffleQueryStage 1
-            +- Exchange hashpartitioning(local_hour#19490, day_type#19491, 8), ENSURE_REQUIREMENTS, [plan_id=10833]
-               +- SortAggregate(key=[pickup_hour#106], functions=[count(1), max(aq_pm25_ugm3#142), max(aq_pm25_max_ugm3#143), max(local_hour#19558), max(day_type#19561), max(aq_quartile#19564), max(aq_epa_category#19565)], output=[pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493])
-                  +- *(2) Sort [pickup_hour#106 ASC NULLS FIRST], false, 0
+            +- Exchange hashpartitioning(local_hour#19621, day_type#19622, 8), ENSURE_REQUIREMENTS, [plan_id=10823]
+               +- SortAggregate(key=[pickup_hour#50], functions=[count(1), max(aq_pm25_ugm3#86), max(aq_pm25_max_ugm3#87), max(local_hour#19689), max(day_type#19692), max(aq_quartile#19695), max(aq_epa_category#19696)], output=[pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624])
+                  +- *(2) Sort [pickup_hour#50 ASC NULLS FIRST], false, 0
                      +- AQEShuffleRead coalesced
                         +- ShuffleQueryStage 0
-                           +- Exchange hashpartitioning(pickup_hour#106, 8), ENSURE_REQUIREMENTS, [plan_id=10787]
-                              +- SortAggregate(key=[pickup_hour#106], functions=[partial_count(1), partial_max(aq_pm25_ugm3#142), partial_max(aq_pm25_max_ugm3#143), partial_max(local_hour#19558), partial_max(day_type#19561), partial_max(aq_quartile#19564), partial_max(aq_epa_category#19565)], output=[pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685])
-                                 +- *(1) Sort [pickup_hour#106 ASC NULLS FIRST], false, 0
-                                    +- *(1) Project [pickup_hour#106, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, hour(from_utc_timestamp(pickup_ts#121, America/New_York), Some(UTC)) AS local_hour#19558, CASE WHEN dayofweek(pickup_date#125) IN (1,7) THEN weekend ELSE weekday END AS day_type#19561, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 3.68) THEN Q1 cleanest WHEN (aq_pm25_ugm3#142 <= 5.56) THEN Q2 WHEN (aq_pm25_ugm3#142 <= 8.86) THEN Q3 ELSE Q4 dirtiest END AS aq_quartile#19564, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#142 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#142 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#142 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19565]
-                                       +- *(1) Filter (isnotnull(air_quality_is_missing#146) AND NOT air_quality_is_missing#146)
+                           +- Exchange hashpartitioning(pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=10777]
+                              +- SortAggregate(key=[pickup_hour#50], functions=[partial_count(1), partial_max(aq_pm25_ugm3#86), partial_max(aq_pm25_max_ugm3#87), partial_max(local_hour#19689), partial_max(day_type#19692), partial_max(aq_quartile#19695), partial_max(aq_epa_category#19696)], output=[pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816])
+                                 +- *(1) Sort [pickup_hour#50 ASC NULLS FIRST], false, 0
+                                    +- *(1) Project [pickup_hour#50, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, hour(from_utc_timestamp(pickup_ts#65, America/New_York), Some(UTC)) AS local_hour#19689, CASE WHEN dayofweek(pickup_date#69) IN (1,7) THEN weekend ELSE weekday END AS day_type#19692, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 3.68) THEN Q1 cleanest WHEN (aq_pm25_ugm3#86 <= 5.56) THEN Q2 WHEN (aq_pm25_ugm3#86 <= 8.86) THEN Q3 ELSE Q4 dirtiest END AS aq_quartile#19695, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#86 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#86 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#86 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19696]
+                                       +- *(1) Filter (isnotnull(air_quality_is_missing#90) AND NOT air_quality_is_missing#90)
                                           +- *(1) ColumnarToRow
-                                             +- FileScan parquet [pickup_hour#106,pickup_ts#121,pickup_date#125,aq_pm25_ugm3#142,aq_pm25_max_ugm3#143,air_quality_is_missing#146,pickup_year_month#126] Batched: true, DataFilters: [isnotnull(air_quality_is_missing#146), NOT air_quality_is_missing#146], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [], PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))], ReadSchema: struct<pickup_hour:timestamp,pickup_ts:timestamp,pickup_date:date,aq_pm25_ugm3:double,aq_pm25_max...
+                                             +- FileScan parquet [pickup_hour#50,pickup_ts#65,pickup_date#69,aq_pm25_ugm3#86,aq_pm25_max_ugm3#87,air_quality_is_missing#90,pickup_year_month#70] Batched: true, DataFilters: [isnotnull(air_quality_is_missing#90), NOT air_quality_is_missing#90], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))], ReadSchema: struct<pickup_hour:timestamp,pickup_ts:timestamp,pickup_date:date,aq_pm25_ugm3:double,aq_pm25_max...
 +- == Initial Plan ==
-   Project [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493, (cast(trip_count#19487L as double) / _we0#19574) AS demand_index#19502]
-   +- Window [avg(trip_count#19487L) windowspecdefinition(local_hour#19490, day_type#19491, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#19574], [local_hour#19490, day_type#19491]
-      +- Sort [local_hour#19490 ASC NULLS FIRST, day_type#19491 ASC NULLS FIRST], false, 0
-         +- Exchange hashpartitioning(local_hour#19490, day_type#19491, 8), ENSURE_REQUIREMENTS, [plan_id=10732]
-            +- SortAggregate(key=[pickup_hour#106], functions=[count(1), max(aq_pm25_ugm3#142), max(aq_pm25_max_ugm3#143), max(local_hour#19558), max(day_type#19561), max(aq_quartile#19564), max(aq_epa_category#19565)], output=[pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493])
-               +- Sort [pickup_hour#106 ASC NULLS FIRST], false, 0
-                  +- Exchange hashpartitioning(pickup_hour#106, 8), ENSURE_REQUIREMENTS, [plan_id=10728]
-                     +- SortAggregate(key=[pickup_hour#106], functions=[partial_count(1), partial_max(aq_pm25_ugm3#142), partial_max(aq_pm25_max_ugm3#143), partial_max(local_hour#19558), partial_max(day_type#19561), partial_max(aq_quartile#19564), partial_max(aq_epa_category#19565)], output=[pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685])
-                        +- Sort [pickup_hour#106 ASC NULLS FIRST], false, 0
-                           +- Project [pickup_hour#106, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, hour(from_utc_timestamp(pickup_ts#121, America/New_York), Some(UTC)) AS local_hour#19558, CASE WHEN dayofweek(pickup_date#125) IN (1,7) THEN weekend ELSE weekday END AS day_type#19561, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 3.68) THEN Q1 cleanest WHEN (aq_pm25_ugm3#142 <= 5.56) THEN Q2 WHEN (aq_pm25_ugm3#142 <= 8.86) THEN Q3 ELSE Q4 dirtiest END AS aq_quartile#19564, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#142 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#142 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#142 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19565]
-                              +- Filter (isnotnull(air_quality_is_missing#146) AND NOT air_quality_is_missing#146)
-                                 +- FileScan parquet [pickup_hour#106,pickup_ts#121,pickup_date#125,aq_pm25_ugm3#142,aq_pm25_max_ugm3#143,air_quality_is_missing#146,pickup_year_month#126] Batched: true, DataFilters: [isnotnull(air_quality_is_missing#146), NOT air_quality_is_missing#146], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-P..., PartitionFilters: [], PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))], ReadSchema: struct<pickup_hour:timestamp,pickup_ts:timestamp,pickup_date:date,aq_pm25_ugm3:double,aq_pm25_max...
+   Project [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624, (cast(trip_count#19618L as double) / _we0#19705) AS demand_index#19633]
+   +- Window [avg(trip_count#19618L) windowspecdefinition(local_hour#19621, day_type#19622, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#19705], [local_hour#19621, day_type#19622]
+      +- Sort [local_hour#19621 ASC NULLS FIRST, day_type#19622 ASC NULLS FIRST], false, 0
+         +- Exchange hashpartitioning(local_hour#19621, day_type#19622, 8), ENSURE_REQUIREMENTS, [plan_id=10722]
+            +- SortAggregate(key=[pickup_hour#50], functions=[count(1), max(aq_pm25_ugm3#86), max(aq_pm25_max_ugm3#87), max(local_hour#19689), max(day_type#19692), max(aq_quartile#19695), max(aq_epa_category#19696)], output=[pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624])
+               +- Sort [pickup_hour#50 ASC NULLS FIRST], false, 0
+                  +- Exchange hashpartitioning(pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=10718]
+                     +- SortAggregate(key=[pickup_hour#50], functions=[partial_count(1), partial_max(aq_pm25_ugm3#86), partial_max(aq_pm25_max_ugm3#87), partial_max(local_hour#19689), partial_max(day_type#19692), partial_max(aq_quartile#19695), partial_max(aq_epa_category#19696)], output=[pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816])
+                        +- Sort [pickup_hour#50 ASC NULLS FIRST], false, 0
+                           +- Project [pickup_hour#50, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, hour(from_utc_timestamp(pickup_ts#65, America/New_York), Some(UTC)) AS local_hour#19689, CASE WHEN dayofweek(pickup_date#69) IN (1,7) THEN weekend ELSE weekday END AS day_type#19692, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 3.68) THEN Q1 cleanest WHEN (aq_pm25_ugm3#86 <= 5.56) THEN Q2 WHEN (aq_pm25_ugm3#86 <= 8.86) THEN Q3 ELSE Q4 dirtiest END AS aq_quartile#19695, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#86 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#86 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#86 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19696]
+                              +- Filter (isnotnull(air_quality_is_missing#90) AND NOT air_quality_is_missing#90)
+                                 +- FileScan parquet [pickup_hour#50,pickup_ts#65,pickup_date#69,aq_pm25_ugm3#86,aq_pm25_max_ugm3#87,air_quality_is_missing#90,pickup_year_month#70] Batched: true, DataFilters: [isnotnull(air_quality_is_missing#90), NOT air_quality_is_missing#90], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))], ReadSchema: struct<pickup_hour:timestamp,pickup_ts:timestamp,pickup_date:date,aq_pm25_ugm3:double,aq_pm25_max...
 ,None)
 
 (3) Scan parquet 
-Output [7]: [pickup_hour#106, pickup_ts#121, pickup_date#125, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, air_quality_is_missing#146, pickup_year_month#126]
+Output [7]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, air_quality_is_missing#90, pickup_year_month#70]
 Batched: true
-Location: PreparedDeltaFileIndex [file:/D:/OwnProjects/Data/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
 PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))]
 ReadSchema: struct<pickup_hour:timestamp,pickup_ts:timestamp,pickup_date:date,aq_pm25_ugm3:double,aq_pm25_max_ugm3:double,air_quality_is_missing:boolean>
 
 (4) ColumnarToRow [codegen id : 1]
-Input [7]: [pickup_hour#106, pickup_ts#121, pickup_date#125, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, air_quality_is_missing#146, pickup_year_month#126]
+Input [7]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, air_quality_is_missing#90, pickup_year_month#70]
 
 (5) Filter [codegen id : 1]
-Input [7]: [pickup_hour#106, pickup_ts#121, pickup_date#125, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, air_quality_is_missing#146, pickup_year_month#126]
-Condition : (isnotnull(air_quality_is_missing#146) AND NOT air_quality_is_missing#146)
+Input [7]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, air_quality_is_missing#90, pickup_year_month#70]
+Condition : (isnotnull(air_quality_is_missing#90) AND NOT air_quality_is_missing#90)
 
 (6) Project [codegen id : 1]
-Output [7]: [pickup_hour#106, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, hour(from_utc_timestamp(pickup_ts#121, America/New_York), Some(UTC)) AS local_hour#19558, CASE WHEN dayofweek(pickup_date#125) IN (1,7) THEN weekend ELSE weekday END AS day_type#19561, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 3.68) THEN Q1 cleanest WHEN (aq_pm25_ugm3#142 <= 5.56) THEN Q2 WHEN (aq_pm25_ugm3#142 <= 8.86) THEN Q3 ELSE Q4 dirtiest END AS aq_quartile#19564, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#142 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#142 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#142 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19565]
-Input [7]: [pickup_hour#106, pickup_ts#121, pickup_date#125, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, air_quality_is_missing#146, pickup_year_month#126]
+Output [7]: [pickup_hour#50, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, hour(from_utc_timestamp(pickup_ts#65, America/New_York), Some(UTC)) AS local_hour#19689, CASE WHEN dayofweek(pickup_date#69) IN (1,7) THEN weekend ELSE weekday END AS day_type#19692, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 3.68) THEN Q1 cleanest WHEN (aq_pm25_ugm3#86 <= 5.56) THEN Q2 WHEN (aq_pm25_ugm3#86 <= 8.86) THEN Q3 ELSE Q4 dirtiest END AS aq_quartile#19695, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#86 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#86 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#86 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19696]
+Input [7]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, air_quality_is_missing#90, pickup_year_month#70]
 
 (7) Sort [codegen id : 1]
-Input [7]: [pickup_hour#106, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, local_hour#19558, day_type#19561, aq_quartile#19564, aq_epa_category#19565]
-Arguments: [pickup_hour#106 ASC NULLS FIRST], false, 0
+Input [7]: [pickup_hour#50, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, local_hour#19689, day_type#19692, aq_quartile#19695, aq_epa_category#19696]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
 
 (8) SortAggregate
-Input [7]: [pickup_hour#106, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, local_hour#19558, day_type#19561, aq_quartile#19564, aq_epa_category#19565]
-Keys [1]: [pickup_hour#106]
-Functions [7]: [partial_count(1), partial_max(aq_pm25_ugm3#142), partial_max(aq_pm25_max_ugm3#143), partial_max(local_hour#19558), partial_max(day_type#19561), partial_max(aq_quartile#19564), partial_max(aq_epa_category#19565)]
-Aggregate Attributes [7]: [count#19672L, max#19673, max#19674, max#19675, max#19676, max#19677, max#19678]
-Results [8]: [pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685]
+Input [7]: [pickup_hour#50, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, local_hour#19689, day_type#19692, aq_quartile#19695, aq_epa_category#19696]
+Keys [1]: [pickup_hour#50]
+Functions [7]: [partial_count(1), partial_max(aq_pm25_ugm3#86), partial_max(aq_pm25_max_ugm3#87), partial_max(local_hour#19689), partial_max(day_type#19692), partial_max(aq_quartile#19695), partial_max(aq_epa_category#19696)]
+Aggregate Attributes [7]: [count#19803L, max#19804, max#19805, max#19806, max#19807, max#19808, max#19809]
+Results [8]: [pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816]
 
 (9) Exchange
-Input [8]: [pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685]
-Arguments: hashpartitioning(pickup_hour#106, 8), ENSURE_REQUIREMENTS, [plan_id=10787]
+Input [8]: [pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816]
+Arguments: hashpartitioning(pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=10777]
 
 (10) ShuffleQueryStage
-Output [8]: [pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685]
+Output [8]: [pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816]
 Arguments: 0
 
 (11) AQEShuffleRead
-Input [8]: [pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685]
+Input [8]: [pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816]
 Arguments: coalesced
 
 (12) Sort [codegen id : 2]
-Input [8]: [pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685]
-Arguments: [pickup_hour#106 ASC NULLS FIRST], false, 0
+Input [8]: [pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
 
 (13) SortAggregate
-Input [8]: [pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685]
-Keys [1]: [pickup_hour#106]
-Functions [7]: [count(1), max(aq_pm25_ugm3#142), max(aq_pm25_max_ugm3#143), max(local_hour#19558), max(day_type#19561), max(aq_quartile#19564), max(aq_epa_category#19565)]
-Aggregate Attributes [7]: [count(1)#19566L, max(aq_pm25_ugm3#142)#19567, max(aq_pm25_max_ugm3#143)#19568, max(local_hour#19558)#19569, max(day_type#19561)#19570, max(aq_quartile#19564)#19571, max(aq_epa_category#19565)#19572]
-Results [8]: [pickup_hour#106, count(1)#19566L AS trip_count#19487L, max(aq_pm25_ugm3#142)#19567 AS pm25#19488, max(aq_pm25_max_ugm3#143)#19568 AS pm25_max#19489, max(local_hour#19558)#19569 AS local_hour#19490, max(day_type#19561)#19570 AS day_type#19491, max(aq_quartile#19564)#19571 AS aq_quartile#19492, max(aq_epa_category#19565)#19572 AS aq_epa_category#19493]
+Input [8]: [pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816]
+Keys [1]: [pickup_hour#50]
+Functions [7]: [count(1), max(aq_pm25_ugm3#86), max(aq_pm25_max_ugm3#87), max(local_hour#19689), max(day_type#19692), max(aq_quartile#19695), max(aq_epa_category#19696)]
+Aggregate Attributes [7]: [count(1)#19697L, max(aq_pm25_ugm3#86)#19698, max(aq_pm25_max_ugm3#87)#19699, max(local_hour#19689)#19700, max(day_type#19692)#19701, max(aq_quartile#19695)#19702, max(aq_epa_category#19696)#19703]
+Results [8]: [pickup_hour#50, count(1)#19697L AS trip_count#19618L, max(aq_pm25_ugm3#86)#19698 AS pm25#19619, max(aq_pm25_max_ugm3#87)#19699 AS pm25_max#19620, max(local_hour#19689)#19700 AS local_hour#19621, max(day_type#19692)#19701 AS day_type#19622, max(aq_quartile#19695)#19702 AS aq_quartile#19623, max(aq_epa_category#19696)#19703 AS aq_epa_category#19624]
 
 (14) Exchange
-Input [8]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493]
-Arguments: hashpartitioning(local_hour#19490, day_type#19491, 8), ENSURE_REQUIREMENTS, [plan_id=10833]
+Input [8]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624]
+Arguments: hashpartitioning(local_hour#19621, day_type#19622, 8), ENSURE_REQUIREMENTS, [plan_id=10823]
 
 (15) ShuffleQueryStage
-Output [8]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493]
+Output [8]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624]
 Arguments: 1
 
 (16) Sort [codegen id : 3]
-Input [8]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493]
-Arguments: [local_hour#19490 ASC NULLS FIRST, day_type#19491 ASC NULLS FIRST], false, 0
+Input [8]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624]
+Arguments: [local_hour#19621 ASC NULLS FIRST, day_type#19622 ASC NULLS FIRST], false, 0
 
 (17) Window
-Input [8]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493]
-Arguments: [avg(trip_count#19487L) windowspecdefinition(local_hour#19490, day_type#19491, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#19574], [local_hour#19490, day_type#19491]
+Input [8]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624]
+Arguments: [avg(trip_count#19618L) windowspecdefinition(local_hour#19621, day_type#19622, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#19705], [local_hour#19621, day_type#19622]
 
 (18) Project [codegen id : 4]
-Output [9]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493, (cast(trip_count#19487L as double) / _we0#19574) AS demand_index#19502]
-Input [9]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493, _we0#19574]
+Output [9]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624, (cast(trip_count#19618L as double) / _we0#19705) AS demand_index#19633]
+Input [9]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624, _we0#19705]
 
 (19) Filter
-Input [7]: [pickup_hour#106, pickup_ts#121, pickup_date#125, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, air_quality_is_missing#146, pickup_year_month#126]
-Condition : (isnotnull(air_quality_is_missing#146) AND NOT air_quality_is_missing#146)
+Input [7]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, air_quality_is_missing#90, pickup_year_month#70]
+Condition : (isnotnull(air_quality_is_missing#90) AND NOT air_quality_is_missing#90)
 
 (20) Project
-Output [7]: [pickup_hour#106, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, hour(from_utc_timestamp(pickup_ts#121, America/New_York), Some(UTC)) AS local_hour#19558, CASE WHEN dayofweek(pickup_date#125) IN (1,7) THEN weekend ELSE weekday END AS day_type#19561, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 3.68) THEN Q1 cleanest WHEN (aq_pm25_ugm3#142 <= 5.56) THEN Q2 WHEN (aq_pm25_ugm3#142 <= 8.86) THEN Q3 ELSE Q4 dirtiest END AS aq_quartile#19564, CASE WHEN isnull(aq_pm25_ugm3#142) THEN null WHEN (aq_pm25_ugm3#142 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#142 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#142 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#142 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19565]
-Input [7]: [pickup_hour#106, pickup_ts#121, pickup_date#125, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, air_quality_is_missing#146, pickup_year_month#126]
+Output [7]: [pickup_hour#50, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, hour(from_utc_timestamp(pickup_ts#65, America/New_York), Some(UTC)) AS local_hour#19689, CASE WHEN dayofweek(pickup_date#69) IN (1,7) THEN weekend ELSE weekday END AS day_type#19692, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 3.68) THEN Q1 cleanest WHEN (aq_pm25_ugm3#86 <= 5.56) THEN Q2 WHEN (aq_pm25_ugm3#86 <= 8.86) THEN Q3 ELSE Q4 dirtiest END AS aq_quartile#19695, CASE WHEN isnull(aq_pm25_ugm3#86) THEN null WHEN (aq_pm25_ugm3#86 <= 12.0) THEN Good WHEN (aq_pm25_ugm3#86 <= 35.4) THEN Moderate WHEN (aq_pm25_ugm3#86 <= 55.4) THEN Unhealthy for Sensitive Groups WHEN (aq_pm25_ugm3#86 <= 150.4) THEN Unhealthy ELSE Very Unhealthy or worse END AS aq_epa_category#19696]
+Input [7]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, air_quality_is_missing#90, pickup_year_month#70]
 
 (21) Sort
-Input [7]: [pickup_hour#106, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, local_hour#19558, day_type#19561, aq_quartile#19564, aq_epa_category#19565]
-Arguments: [pickup_hour#106 ASC NULLS FIRST], false, 0
+Input [7]: [pickup_hour#50, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, local_hour#19689, day_type#19692, aq_quartile#19695, aq_epa_category#19696]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
 
 (22) SortAggregate
-Input [7]: [pickup_hour#106, aq_pm25_ugm3#142, aq_pm25_max_ugm3#143, local_hour#19558, day_type#19561, aq_quartile#19564, aq_epa_category#19565]
-Keys [1]: [pickup_hour#106]
-Functions [7]: [partial_count(1), partial_max(aq_pm25_ugm3#142), partial_max(aq_pm25_max_ugm3#143), partial_max(local_hour#19558), partial_max(day_type#19561), partial_max(aq_quartile#19564), partial_max(aq_epa_category#19565)]
-Aggregate Attributes [7]: [count#19672L, max#19673, max#19674, max#19675, max#19676, max#19677, max#19678]
-Results [8]: [pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685]
+Input [7]: [pickup_hour#50, aq_pm25_ugm3#86, aq_pm25_max_ugm3#87, local_hour#19689, day_type#19692, aq_quartile#19695, aq_epa_category#19696]
+Keys [1]: [pickup_hour#50]
+Functions [7]: [partial_count(1), partial_max(aq_pm25_ugm3#86), partial_max(aq_pm25_max_ugm3#87), partial_max(local_hour#19689), partial_max(day_type#19692), partial_max(aq_quartile#19695), partial_max(aq_epa_category#19696)]
+Aggregate Attributes [7]: [count#19803L, max#19804, max#19805, max#19806, max#19807, max#19808, max#19809]
+Results [8]: [pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816]
 
 (23) Exchange
-Input [8]: [pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685]
-Arguments: hashpartitioning(pickup_hour#106, 8), ENSURE_REQUIREMENTS, [plan_id=10728]
+Input [8]: [pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816]
+Arguments: hashpartitioning(pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=10718]
 
 (24) Sort
-Input [8]: [pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685]
-Arguments: [pickup_hour#106 ASC NULLS FIRST], false, 0
+Input [8]: [pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
 
 (25) SortAggregate
-Input [8]: [pickup_hour#106, count#19679L, max#19680, max#19681, max#19682, max#19683, max#19684, max#19685]
-Keys [1]: [pickup_hour#106]
-Functions [7]: [count(1), max(aq_pm25_ugm3#142), max(aq_pm25_max_ugm3#143), max(local_hour#19558), max(day_type#19561), max(aq_quartile#19564), max(aq_epa_category#19565)]
-Aggregate Attributes [7]: [count(1)#19566L, max(aq_pm25_ugm3#142)#19567, max(aq_pm25_max_ugm3#143)#19568, max(local_hour#19558)#19569, max(day_type#19561)#19570, max(aq_quartile#19564)#19571, max(aq_epa_category#19565)#19572]
-Results [8]: [pickup_hour#106, count(1)#19566L AS trip_count#19487L, max(aq_pm25_ugm3#142)#19567 AS pm25#19488, max(aq_pm25_max_ugm3#143)#19568 AS pm25_max#19489, max(local_hour#19558)#19569 AS local_hour#19490, max(day_type#19561)#19570 AS day_type#19491, max(aq_quartile#19564)#19571 AS aq_quartile#19492, max(aq_epa_category#19565)#19572 AS aq_epa_category#19493]
+Input [8]: [pickup_hour#50, count#19810L, max#19811, max#19812, max#19813, max#19814, max#19815, max#19816]
+Keys [1]: [pickup_hour#50]
+Functions [7]: [count(1), max(aq_pm25_ugm3#86), max(aq_pm25_max_ugm3#87), max(local_hour#19689), max(day_type#19692), max(aq_quartile#19695), max(aq_epa_category#19696)]
+Aggregate Attributes [7]: [count(1)#19697L, max(aq_pm25_ugm3#86)#19698, max(aq_pm25_max_ugm3#87)#19699, max(local_hour#19689)#19700, max(day_type#19692)#19701, max(aq_quartile#19695)#19702, max(aq_epa_category#19696)#19703]
+Results [8]: [pickup_hour#50, count(1)#19697L AS trip_count#19618L, max(aq_pm25_ugm3#86)#19698 AS pm25#19619, max(aq_pm25_max_ugm3#87)#19699 AS pm25_max#19620, max(local_hour#19689)#19700 AS local_hour#19621, max(day_type#19692)#19701 AS day_type#19622, max(aq_quartile#19695)#19702 AS aq_quartile#19623, max(aq_epa_category#19696)#19703 AS aq_epa_category#19624]
 
 (26) Exchange
-Input [8]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493]
-Arguments: hashpartitioning(local_hour#19490, day_type#19491, 8), ENSURE_REQUIREMENTS, [plan_id=10732]
+Input [8]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624]
+Arguments: hashpartitioning(local_hour#19621, day_type#19622, 8), ENSURE_REQUIREMENTS, [plan_id=10722]
 
 (27) Sort
-Input [8]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493]
-Arguments: [local_hour#19490 ASC NULLS FIRST, day_type#19491 ASC NULLS FIRST], false, 0
+Input [8]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624]
+Arguments: [local_hour#19621 ASC NULLS FIRST, day_type#19622 ASC NULLS FIRST], false, 0
 
 (28) Window
-Input [8]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493]
-Arguments: [avg(trip_count#19487L) windowspecdefinition(local_hour#19490, day_type#19491, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#19574], [local_hour#19490, day_type#19491]
+Input [8]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624]
+Arguments: [avg(trip_count#19618L) windowspecdefinition(local_hour#19621, day_type#19622, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#19705], [local_hour#19621, day_type#19622]
 
 (29) Project
-Output [9]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493, (cast(trip_count#19487L as double) / _we0#19574) AS demand_index#19502]
-Input [9]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493, _we0#19574]
+Output [9]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624, (cast(trip_count#19618L as double) / _we0#19705) AS demand_index#19633]
+Input [9]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624, _we0#19705]
 
 (30) AdaptiveSparkPlan
-Output [9]: [pickup_hour#106, trip_count#19487L, pm25#19488, pm25_max#19489, local_hour#19490, day_type#19491, aq_quartile#19492, aq_epa_category#19493, demand_index#19502]
+Output [9]: [pickup_hour#50, trip_count#19618L, pm25#19619, pm25_max#19620, local_hour#19621, day_type#19622, aq_quartile#19623, aq_epa_category#19624, demand_index#19633]
 Arguments: isFinalPlan=true
 
 (31) HashAggregate
-Input [2]: [trip_count#19495L, aq_epa_category#19501]
-Keys [1]: [aq_epa_category#19501]
-Functions [2]: [partial_count(1), partial_avg(trip_count#19495L)]
-Aggregate Attributes [3]: [count#21290L, sum#21291, count#21292L]
-Results [4]: [aq_epa_category#19501, count#21293L, sum#21294, count#21295L]
+Input [2]: [trip_count#19626L, aq_epa_category#19632]
+Keys [1]: [aq_epa_category#19632]
+Functions [2]: [partial_count(1), partial_avg(trip_count#19626L)]
+Aggregate Attributes [3]: [count#21421L, sum#21422, count#21423L]
+Results [4]: [aq_epa_category#19632, count#21424L, sum#21425, count#21426L]
 
 (32) Exchange
-Input [4]: [aq_epa_category#19501, count#21293L, sum#21294, count#21295L]
-Arguments: hashpartitioning(aq_epa_category#19501, 8), ENSURE_REQUIREMENTS, [plan_id=11166]
+Input [4]: [aq_epa_category#19632, count#21424L, sum#21425, count#21426L]
+Arguments: hashpartitioning(aq_epa_category#19632, 8), ENSURE_REQUIREMENTS, [plan_id=11156]
 
 (33) HashAggregate
-Input [4]: [aq_epa_category#19501, count#21293L, sum#21294, count#21295L]
-Keys [1]: [aq_epa_category#19501]
-Functions [2]: [count(1), avg(trip_count#19495L)]
-Aggregate Attributes [2]: [count(1)#21153L, avg(trip_count#19495L)#21154]
-Results [3]: [aq_epa_category#19501, count(1)#21153L AS hours#21145L, round(avg(trip_count#19495L)#21154, 1) AS avg_trips_per_hour#21146]
+Input [4]: [aq_epa_category#19632, count#21424L, sum#21425, count#21426L]
+Keys [1]: [aq_epa_category#19632]
+Functions [2]: [count(1), avg(trip_count#19626L)]
+Aggregate Attributes [2]: [count(1)#21284L, avg(trip_count#19626L)#21285]
+Results [3]: [aq_epa_category#19632, count(1)#21284L AS hours#21276L, round(avg(trip_count#19626L)#21285, 1) AS avg_trips_per_hour#21277]
 
 (34) Exchange
-Input [3]: [aq_epa_category#19501, hours#21145L, avg_trips_per_hour#21146]
-Arguments: rangepartitioning(hours#21145L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=11169]
+Input [3]: [aq_epa_category#19632, hours#21276L, avg_trips_per_hour#21277]
+Arguments: rangepartitioning(hours#21276L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=11159]
 
 (35) Sort
-Input [3]: [aq_epa_category#19501, hours#21145L, avg_trips_per_hour#21146]
-Arguments: [hours#21145L DESC NULLS LAST], true, 0
+Input [3]: [aq_epa_category#19632, hours#21276L, avg_trips_per_hour#21277]
+Arguments: [hours#21276L DESC NULLS LAST], true, 0
 
 (36) AdaptiveSparkPlan
-Output [3]: [aq_epa_category#19501, hours#21145L, avg_trips_per_hour#21146]
+Output [3]: [aq_epa_category#19632, hours#21276L, avg_trips_per_hour#21277]
 Arguments: isFinalPlan=false
 
 

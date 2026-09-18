@@ -1,0 +1,183 @@
+# product_weather_impact_summary / compute Q4 from the gold table
+
+== Physical Plan ==
+AdaptiveSparkPlan (29)
++- Sort (28)
+   +- Exchange (27)
+      +- Project (26)
+         +- Filter (25)
+            +- HashAggregate (24)
+               +- Exchange (23)
+                  +- HashAggregate (22)
+                     +- Project (21)
+                        +- SortMergeJoin Inner (20)
+                           :- Sort (8)
+                           :  +- Exchange (7)
+                           :     +- HashAggregate (6)
+                           :        +- Exchange (5)
+                           :           +- HashAggregate (4)
+                           :              +- Project (3)
+                           :                 +- Filter (2)
+                           :                    +- Scan parquet  (1)
+                           +- Sort (19)
+                              +- Filter (18)
+                                 +- HashAggregate (17)
+                                    +- Exchange (16)
+                                       +- HashAggregate (15)
+                                          +- HashAggregate (14)
+                                             +- Exchange (13)
+                                                +- HashAggregate (12)
+                                                   +- Project (11)
+                                                      +- Filter (10)
+                                                         +- Scan parquet  (9)
+
+
+(1) Scan parquet 
+Output [4]: [pu_location_id#96054, weather_condition_code#96088, weather_is_missing#96090, pickup_year_month#96075]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [IsNotNull(weather_is_missing), Not(In(pu_location_id, [264,265])), Not(EqualTo(weather_is_missing,true))]
+ReadSchema: struct<pu_location_id:int,weather_condition_code:int,weather_is_missing:boolean>
+
+(2) Filter
+Input [4]: [pu_location_id#96054, weather_condition_code#96088, weather_is_missing#96090, pickup_year_month#96075]
+Condition : (((isnotnull(weather_is_missing#96090) AND NOT pu_location_id#96054 IN (264,265)) AND NOT weather_is_missing#96090) AND CASE WHEN isnull(weather_condition_code#96088) THEN false WHEN weather_condition_code#96088 IN (1,2) THEN true WHEN weather_condition_code#96088 IN (3,4) THEN true WHEN weather_condition_code#96088 IN (5,6) THEN true WHEN weather_condition_code#96088 IN (7,8,9,17,18) THEN true WHEN weather_condition_code#96088 INSET 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 24 THEN true WHEN weather_condition_code#96088 IN (23,25,26,27) THEN true ELSE false END)
+
+(3) Project
+Output [2]: [pu_location_id#96054, CASE WHEN isnull(weather_condition_code#96088) THEN null WHEN weather_condition_code#96088 IN (1,2) THEN Clear WHEN weather_condition_code#96088 IN (3,4) THEN Cloudy WHEN weather_condition_code#96088 IN (5,6) THEN Fog WHEN weather_condition_code#96088 IN (7,8,9,17,18) THEN Rain WHEN weather_condition_code#96088 INSET 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 24 THEN Snow/Ice WHEN weather_condition_code#96088 IN (23,25,26,27) THEN Storm END AS weather_family#96049]
+Input [4]: [pu_location_id#96054, weather_condition_code#96088, weather_is_missing#96090, pickup_year_month#96075]
+
+(4) HashAggregate
+Input [2]: [pu_location_id#96054, weather_family#96049]
+Keys [2]: [pu_location_id#96054, weather_family#96049]
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#96292L]
+Results [3]: [pu_location_id#96054, weather_family#96049, count#96293L]
+
+(5) Exchange
+Input [3]: [pu_location_id#96054, weather_family#96049, count#96293L]
+Arguments: hashpartitioning(pu_location_id#96054, weather_family#96049, 8), ENSURE_REQUIREMENTS, [plan_id=61795]
+
+(6) HashAggregate
+Input [3]: [pu_location_id#96054, weather_family#96049, count#96293L]
+Keys [2]: [pu_location_id#96054, weather_family#96049]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#96103L]
+Results [3]: [pu_location_id#96054, weather_family#96049, count(1)#96103L AS trips#95910L]
+
+(7) Exchange
+Input [3]: [pu_location_id#96054, weather_family#96049, trips#95910L]
+Arguments: hashpartitioning(weather_family#96049, 8), ENSURE_REQUIREMENTS, [plan_id=61806]
+
+(8) Sort
+Input [3]: [pu_location_id#96054, weather_family#96049, trips#95910L]
+Arguments: [weather_family#96049 ASC NULLS FIRST], false, 0
+
+(9) Scan parquet 
+Output [4]: [pickup_hour#50, weather_condition_code#83, weather_is_missing#85, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [IsNotNull(weather_is_missing), Not(EqualTo(weather_is_missing,true))]
+ReadSchema: struct<pickup_hour:timestamp,weather_condition_code:int,weather_is_missing:boolean>
+
+(10) Filter
+Input [4]: [pickup_hour#50, weather_condition_code#83, weather_is_missing#85, pickup_year_month#70]
+Condition : ((isnotnull(weather_is_missing#85) AND NOT weather_is_missing#85) AND CASE WHEN isnull(weather_condition_code#83) THEN false WHEN weather_condition_code#83 IN (1,2) THEN true WHEN weather_condition_code#83 IN (3,4) THEN true WHEN weather_condition_code#83 IN (5,6) THEN true WHEN weather_condition_code#83 IN (7,8,9,17,18) THEN true WHEN weather_condition_code#83 INSET 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 24 THEN true WHEN weather_condition_code#83 IN (23,25,26,27) THEN true ELSE false END)
+
+(11) Project
+Output [2]: [pickup_hour#50, CASE WHEN isnull(weather_condition_code#83) THEN null WHEN weather_condition_code#83 IN (1,2) THEN Clear WHEN weather_condition_code#83 IN (3,4) THEN Cloudy WHEN weather_condition_code#83 IN (5,6) THEN Fog WHEN weather_condition_code#83 IN (7,8,9,17,18) THEN Rain WHEN weather_condition_code#83 INSET 10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 24 THEN Snow/Ice WHEN weather_condition_code#83 IN (23,25,26,27) THEN Storm END AS weather_family#95986]
+Input [4]: [pickup_hour#50, weather_condition_code#83, weather_is_missing#85, pickup_year_month#70]
+
+(12) HashAggregate
+Input [2]: [pickup_hour#50, weather_family#95986]
+Keys [2]: [weather_family#95986, pickup_hour#50]
+Functions: []
+Aggregate Attributes: []
+Results [2]: [weather_family#95986, pickup_hour#50]
+
+(13) Exchange
+Input [2]: [weather_family#95986, pickup_hour#50]
+Arguments: hashpartitioning(weather_family#95986, pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=61797]
+
+(14) HashAggregate
+Input [2]: [weather_family#95986, pickup_hour#50]
+Keys [2]: [weather_family#95986, pickup_hour#50]
+Functions: []
+Aggregate Attributes: []
+Results [2]: [weather_family#95986, pickup_hour#50]
+
+(15) HashAggregate
+Input [2]: [weather_family#95986, pickup_hour#50]
+Keys [1]: [weather_family#95986]
+Functions [1]: [partial_count(distinct pickup_hour#50)]
+Aggregate Attributes [1]: [count(pickup_hour#50)#96100L]
+Results [2]: [weather_family#95986, count#96296L]
+
+(16) Exchange
+Input [2]: [weather_family#95986, count#96296L]
+Arguments: hashpartitioning(weather_family#95986, 8), ENSURE_REQUIREMENTS, [plan_id=61801]
+
+(17) HashAggregate
+Input [2]: [weather_family#95986, count#96296L]
+Keys [1]: [weather_family#95986]
+Functions [1]: [count(distinct pickup_hour#50)]
+Aggregate Attributes [1]: [count(pickup_hour#50)#96100L]
+Results [2]: [weather_family#95986, count(pickup_hour#50)#96100L AS hours#95907L]
+
+(18) Filter
+Input [2]: [weather_family#95986, hours#95907L]
+Condition : (hours#95907L >= 24)
+
+(19) Sort
+Input [2]: [weather_family#95986, hours#95907L]
+Arguments: [weather_family#95986 ASC NULLS FIRST], false, 0
+
+(20) SortMergeJoin
+Left keys [1]: [weather_family#96049]
+Right keys [1]: [weather_family#95986]
+Join type: Inner
+Join condition: None
+
+(21) Project
+Output [3]: [pu_location_id#96054, trips#95910L, (cast(trips#95910L as double) / cast(hours#95907L as double)) AS trips_per_hour#95911]
+Input [5]: [pu_location_id#96054, weather_family#96049, trips#95910L, weather_family#95986, hours#95907L]
+
+(22) HashAggregate
+Input [3]: [pu_location_id#96054, trips#95910L, trips_per_hour#95911]
+Keys [1]: [pu_location_id#96054]
+Functions [4]: [partial_count(1), partial_sum(trips#95910L), partial_avg(trips_per_hour#95911), partial_stddev_samp(trips_per_hour#95911)]
+Aggregate Attributes [7]: [count#96284L, sum#96285L, sum#96286, count#96287L, n#96109, avg#96110, m2#96111]
+Results [8]: [pu_location_id#96054, count#96288L, sum#96289L, sum#96290, count#96291L, n#96114, avg#96115, m2#96116]
+
+(23) Exchange
+Input [8]: [pu_location_id#96054, count#96288L, sum#96289L, sum#96290, count#96291L, n#96114, avg#96115, m2#96116]
+Arguments: hashpartitioning(pu_location_id#96054, 8), ENSURE_REQUIREMENTS, [plan_id=61813]
+
+(24) HashAggregate
+Input [8]: [pu_location_id#96054, count#96288L, sum#96289L, sum#96290, count#96291L, n#96114, avg#96115, m2#96116]
+Keys [1]: [pu_location_id#96054]
+Functions [4]: [count(1), sum(trips#95910L), avg(trips_per_hour#95911), stddev_samp(trips_per_hour#95911)]
+Aggregate Attributes [4]: [count(1)#96104L, sum(trips#95910L)#96107L, avg(trips_per_hour#95911)#96108, stddev_samp(trips_per_hour#95911)#96117]
+Results [5]: [pu_location_id#96054, count(1)#96104L AS families_observed#95914L, sum(trips#95910L)#96107L AS total_trips#95915L, avg(trips_per_hour#95911)#96108 AS mean_tph#95916, stddev_samp(trips_per_hour#95911)#96117 AS sd_tph#95917]
+
+(25) Filter
+Input [5]: [pu_location_id#96054, families_observed#95914L, total_trips#95915L, mean_tph#95916, sd_tph#95917]
+Condition : ((isnotnull(total_trips#95915L) AND isnotnull(mean_tph#95916)) AND (((families_observed#95914L >= 4) AND (total_trips#95915L >= 10000)) AND (mean_tph#95916 > 0.0)))
+
+(26) Project
+Output [2]: [pu_location_id#96054, round((sd_tph#95917 / mean_tph#95916), 4) AS coef_of_variation#95905]
+Input [5]: [pu_location_id#96054, families_observed#95914L, total_trips#95915L, mean_tph#95916, sd_tph#95917]
+
+(27) Exchange
+Input [2]: [pu_location_id#96054, coef_of_variation#95905]
+Arguments: rangepartitioning(pu_location_id#96054 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=61818]
+
+(28) Sort
+Input [2]: [pu_location_id#96054, coef_of_variation#95905]
+Arguments: [pu_location_id#96054 ASC NULLS FIRST], true, 0
+
+(29) AdaptiveSparkPlan
+Output [2]: [pu_location_id#96054, coef_of_variation#95905]
+Arguments: isFinalPlan=false
+
+

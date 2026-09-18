@@ -1,0 +1,44 @@
+# product_hourly_air_quality_demand / recompute from hourly_air_quality_demand
+
+== Physical Plan ==
+AdaptiveSparkPlan (6)
++- HashAggregate (5)
+   +- Exchange (4)
+      +- HashAggregate (3)
+         +- Project (2)
+            +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [4]: [trip_count#681L, demand_index#682, pm25_ugm3#683, pickup_year_month#676]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/products/hourly_air_quality_demand]
+ReadSchema: struct<trip_count:bigint,demand_index:double,pm25_ugm3:double>
+
+(2) Project
+Output [3]: [trip_count#681L, demand_index#682, pm25_ugm3#683]
+Input [4]: [trip_count#681L, demand_index#682, pm25_ugm3#683, pickup_year_month#676]
+
+(3) HashAggregate
+Input [3]: [trip_count#681L, demand_index#682, pm25_ugm3#683]
+Keys: []
+Functions [2]: [partial_corr(cast(trip_count#681L as double), pm25_ugm3#683), partial_corr(demand_index#682, pm25_ugm3#683)]
+Aggregate Attributes [12]: [n#102617, xAvg#102618, yAvg#102619, ck#102620, xMk#102621, yMk#102622, n#102592, xAvg#102593, yAvg#102594, ck#102595, xMk#102596, yMk#102597]
+Results [12]: [n#102623, xAvg#102624, yAvg#102625, ck#102626, xMk#102627, yMk#102628, n#102598, xAvg#102599, yAvg#102600, ck#102601, xMk#102602, yMk#102603]
+
+(4) Exchange
+Input [12]: [n#102623, xAvg#102624, yAvg#102625, ck#102626, xMk#102627, yMk#102628, n#102598, xAvg#102599, yAvg#102600, ck#102601, xMk#102602, yMk#102603]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=65805]
+
+(5) HashAggregate
+Input [12]: [n#102623, xAvg#102624, yAvg#102625, ck#102626, xMk#102627, yMk#102628, n#102598, xAvg#102599, yAvg#102600, ck#102601, xMk#102602, yMk#102603]
+Keys: []
+Functions [2]: [corr(cast(trip_count#681L as double), pm25_ugm3#683), corr(demand_index#682, pm25_ugm3#683)]
+Aggregate Attributes [2]: [corr(cast(trip_count#681L as double), pm25_ugm3#683)#102591, corr(demand_index#682, pm25_ugm3#683)#102604]
+Results [2]: [round(corr(cast(trip_count#681L as double), pm25_ugm3#683)#102591, 4) AS corr_raw#102572, round(corr(demand_index#682, pm25_ugm3#683)#102604, 4) AS corr_controlled#102573]
+
+(6) AdaptiveSparkPlan
+Output [2]: [corr_raw#102572, corr_controlled#102573]
+Arguments: isFinalPlan=false
+
+

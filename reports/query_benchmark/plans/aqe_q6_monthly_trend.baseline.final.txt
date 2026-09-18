@@ -1,0 +1,20 @@
+# aqe_q6_monthly_trend / AQE off
+
+*(6) Sort [pickup_borough#91 ASC NULLS FIRST, pickup_year_month#70 ASC NULLS FIRST], true, 0
++- Exchange rangepartitioning(pickup_borough#91 ASC NULLS FIRST, pickup_year_month#70 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=55178]
+   +- *(5) Project [pickup_year_month#70, pickup_borough#91, trip_count#87044L, trips_per_day#87041, round(((100.0 * (trips_per_day#87045 - _we0#87112)) / _we1#87113), 2) AS mom_change_pct#87042, round(((100.0 * cast(trip_count#87044L as decimal(20,0))) / cast(_we2#87114L as decimal(20,0))), 2) AS pct_of_city#87043]
+      +- Window [sum(trip_count#87044L) windowspecdefinition(pickup_year_month#70, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we2#87114L], [pickup_year_month#70]
+         +- *(4) Sort [pickup_year_month#70 ASC NULLS FIRST], false, 0
+            +- Exchange hashpartitioning(pickup_year_month#70, 8), ENSURE_REQUIREMENTS, [plan_id=55170]
+               +- Window [lag(trips_per_day#87045, -1, null) windowspecdefinition(pickup_borough#91, pickup_year_month#70 ASC NULLS FIRST, specifiedwindowframe(RowFrame, -1, -1)) AS _we0#87112, lag(trips_per_day#87045, -1, null) windowspecdefinition(pickup_borough#91, pickup_year_month#70 ASC NULLS FIRST, specifiedwindowframe(RowFrame, -1, -1)) AS _we1#87113], [pickup_borough#91], [pickup_year_month#70 ASC NULLS FIRST]
+                  +- *(3) Sort [pickup_borough#91 ASC NULLS FIRST, pickup_year_month#70 ASC NULLS FIRST], false, 0
+                     +- Exchange hashpartitioning(pickup_borough#91, 8), ENSURE_REQUIREMENTS, [plan_id=55165]
+                        +- *(2) Project [pickup_year_month#70, pickup_borough#91, trip_count#87044L, round(trips_per_day#87045, 1) AS trips_per_day#87041, trips_per_day#87045]
+                           +- *(2) HashAggregate(keys=[pickup_year_month#70, pickup_borough#91], functions=[count(1)], output=[pickup_year_month#70, pickup_borough#91, trip_count#87044L, trips_per_day#87045])
+                              +- Exchange hashpartitioning(pickup_year_month#70, pickup_borough#91, 8), ENSURE_REQUIREMENTS, [plan_id=55160]
+                                 +- *(1) HashAggregate(keys=[pickup_year_month#70, pickup_borough#91], functions=[partial_count(1)], output=[pickup_year_month#70, pickup_borough#91, count#87199L])
+                                    +- *(1) Project [pickup_year_month#70, pickup_borough#91]
+                                       +- *(1) Filter NOT pu_location_id#49 IN (264,265)
+                                          +- *(1) ColumnarToRow
+                                             +- FileScan parquet [pu_location_id#49,pickup_borough#91,pickup_year_month#70] Batched: true, DataFilters: [NOT pu_location_id#49 IN (264,265)], Format: Parquet, Location: PreparedDeltaFileIndex(1 paths)[file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-G..., PartitionFilters: [], PushedFilters: [Not(In(pu_location_id, [264,265]))], ReadSchema: struct<pu_location_id:int,pickup_borough:string>
+

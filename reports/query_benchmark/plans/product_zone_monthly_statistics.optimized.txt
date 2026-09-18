@@ -1,0 +1,33 @@
+# product_zone_monthly_statistics / read zone_monthly_statistics
+
+== Physical Plan ==
+AdaptiveSparkPlan (5)
++- Sort (4)
+   +- Exchange (3)
+      +- Project (2)
+         +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [4]: [pu_location_id#559, trip_count#562L, dropoff_count#563L, pickup_year_month#558]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/products/zone_monthly_statistics]
+ReadSchema: struct<pu_location_id:int,trip_count:bigint,dropoff_count:bigint>
+
+(2) Project
+Output [4]: [pickup_year_month#558, pu_location_id#559, trip_count#562L, dropoff_count#563L]
+Input [4]: [pu_location_id#559, trip_count#562L, dropoff_count#563L, pickup_year_month#558]
+
+(3) Exchange
+Input [4]: [pickup_year_month#558, pu_location_id#559, trip_count#562L, dropoff_count#563L]
+Arguments: rangepartitioning(pickup_year_month#558 ASC NULLS FIRST, pu_location_id#559 ASC NULLS FIRST, 8), ENSURE_REQUIREMENTS, [plan_id=59810]
+
+(4) Sort
+Input [4]: [pickup_year_month#558, pu_location_id#559, trip_count#562L, dropoff_count#563L]
+Arguments: [pickup_year_month#558 ASC NULLS FIRST, pu_location_id#559 ASC NULLS FIRST], true, 0
+
+(5) AdaptiveSparkPlan
+Output [4]: [pickup_year_month#558, pu_location_id#559, trip_count#562L, dropoff_count#563L]
+Arguments: isFinalPlan=false
+
+

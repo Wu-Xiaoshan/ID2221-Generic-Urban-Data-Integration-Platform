@@ -1,0 +1,101 @@
+# aqe_q3_aq_demand_correlation / AQE on
+
+== Physical Plan ==
+AdaptiveSparkPlan (16)
++- HashAggregate (15)
+   +- Exchange (14)
+      +- HashAggregate (13)
+         +- Project (12)
+            +- Window (11)
+               +- Sort (10)
+                  +- Exchange (9)
+                     +- SortAggregate (8)
+                        +- Sort (7)
+                           +- Exchange (6)
+                              +- SortAggregate (5)
+                                 +- Sort (4)
+                                    +- Project (3)
+                                       +- Filter (2)
+                                          +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [6]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PushedFilters: [IsNotNull(air_quality_is_missing), Not(EqualTo(air_quality_is_missing,true))]
+ReadSchema: struct<pickup_hour:timestamp,pickup_ts:timestamp,pickup_date:date,aq_pm25_ugm3:double,air_quality_is_missing:boolean>
+
+(2) Filter
+Input [6]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+Condition : (isnotnull(air_quality_is_missing#90) AND NOT air_quality_is_missing#90)
+
+(3) Project
+Output [4]: [pickup_hour#50, aq_pm25_ugm3#86, hour(from_utc_timestamp(pickup_ts#65, America/New_York), Some(UTC)) AS local_hour#69770, CASE WHEN dayofweek(pickup_date#69) IN (1,7) THEN weekend ELSE weekday END AS day_type#69773]
+Input [6]: [pickup_hour#50, pickup_ts#65, pickup_date#69, aq_pm25_ugm3#86, air_quality_is_missing#90, pickup_year_month#70]
+
+(4) Sort
+Input [4]: [pickup_hour#50, aq_pm25_ugm3#86, local_hour#69770, day_type#69773]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
+
+(5) SortAggregate
+Input [4]: [pickup_hour#50, aq_pm25_ugm3#86, local_hour#69770, day_type#69773]
+Keys [1]: [pickup_hour#50]
+Functions [4]: [partial_count(1), partial_max(aq_pm25_ugm3#86), partial_max(local_hour#69770), partial_max(day_type#69773)]
+Aggregate Attributes [4]: [count#69970L, max#69971, max#69972, max#69973]
+Results [5]: [pickup_hour#50, count#69974L, max#69975, max#69976, max#69977]
+
+(6) Exchange
+Input [5]: [pickup_hour#50, count#69974L, max#69975, max#69976, max#69977]
+Arguments: hashpartitioning(pickup_hour#50, 8), ENSURE_REQUIREMENTS, [plan_id=41643]
+
+(7) Sort
+Input [5]: [pickup_hour#50, count#69974L, max#69975, max#69976, max#69977]
+Arguments: [pickup_hour#50 ASC NULLS FIRST], false, 0
+
+(8) SortAggregate
+Input [5]: [pickup_hour#50, count#69974L, max#69975, max#69976, max#69977]
+Keys [1]: [pickup_hour#50]
+Functions [4]: [count(1), max(aq_pm25_ugm3#86), max(local_hour#69770), max(day_type#69773)]
+Aggregate Attributes [4]: [count(1)#69778L, max(aq_pm25_ugm3#86)#69779, max(local_hour#69770)#69781, max(day_type#69773)#69782]
+Results [4]: [count(1)#69778L AS trip_count#69699L, max(aq_pm25_ugm3#86)#69779 AS pm25#69700, max(local_hour#69770)#69781 AS local_hour#69702, max(day_type#69773)#69782 AS day_type#69703]
+
+(9) Exchange
+Input [4]: [trip_count#69699L, pm25#69700, local_hour#69702, day_type#69703]
+Arguments: hashpartitioning(local_hour#69702, day_type#69703, 8), ENSURE_REQUIREMENTS, [plan_id=41647]
+
+(10) Sort
+Input [4]: [trip_count#69699L, pm25#69700, local_hour#69702, day_type#69703]
+Arguments: [local_hour#69702 ASC NULLS FIRST, day_type#69703 ASC NULLS FIRST], false, 0
+
+(11) Window
+Input [4]: [trip_count#69699L, pm25#69700, local_hour#69702, day_type#69703]
+Arguments: [avg(trip_count#69699L) windowspecdefinition(local_hour#69702, day_type#69703, specifiedwindowframe(RowFrame, unboundedpreceding$(), unboundedfollowing$())) AS _we0#69786], [local_hour#69702, day_type#69703]
+
+(12) Project
+Output [3]: [trip_count#69699L, pm25#69700, (cast(trip_count#69699L as double) / _we0#69786) AS demand_index#69714]
+Input [5]: [trip_count#69699L, pm25#69700, local_hour#69702, day_type#69703, _we0#69786]
+
+(13) HashAggregate
+Input [3]: [trip_count#69699L, pm25#69700, demand_index#69714]
+Keys: []
+Functions [4]: [partial_count(1), partial_avg(pm25#69700), partial_corr(cast(trip_count#69699L as double), pm25#69700), partial_corr(demand_index#69714, pm25#69700)]
+Aggregate Attributes [15]: [count#69964L, sum#69965, count#69966L, n#69839, xAvg#69840, yAvg#69841, ck#69842, xMk#69843, yMk#69844, n#69851, xAvg#69852, yAvg#69853, ck#69854, xMk#69855, yMk#69856]
+Results [15]: [count#69967L, sum#69968, count#69969L, n#69845, xAvg#69846, yAvg#69847, ck#69848, xMk#69849, yMk#69850, n#69857, xAvg#69858, yAvg#69859, ck#69860, xMk#69861, yMk#69862]
+
+(14) Exchange
+Input [15]: [count#69967L, sum#69968, count#69969L, n#69845, xAvg#69846, yAvg#69847, ck#69848, xMk#69849, yMk#69850, n#69857, xAvg#69858, yAvg#69859, ck#69860, xMk#69861, yMk#69862]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=41653]
+
+(15) HashAggregate
+Input [15]: [count#69967L, sum#69968, count#69969L, n#69845, xAvg#69846, yAvg#69847, ck#69848, xMk#69849, yMk#69850, n#69857, xAvg#69858, yAvg#69859, ck#69860, xMk#69861, yMk#69862]
+Keys: []
+Functions [4]: [count(1), avg(pm25#69700), corr(cast(trip_count#69699L as double), pm25#69700), corr(demand_index#69714, pm25#69700)]
+Aggregate Attributes [4]: [count(1)#69787L, avg(pm25#69700)#69788, corr(cast(trip_count#69699L as double), pm25#69700)#69801, corr(demand_index#69714, pm25#69700)#69814]
+Results [4]: [count(1)#69787L AS hours#69689L, round(avg(pm25#69700)#69788, 2) AS avg_pm25#69690, round(corr(cast(trip_count#69699L as double), pm25#69700)#69801, 4) AS corr_raw#69691, round(corr(demand_index#69714, pm25#69700)#69814, 4) AS corr_controlled#69692]
+
+(16) AdaptiveSparkPlan
+Output [4]: [hours#69689L, avg_pm25#69690, corr_raw#69691, corr_controlled#69692]
+Arguments: isFinalPlan=false
+
+

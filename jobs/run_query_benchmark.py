@@ -12,11 +12,28 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from urbanplatform.analytics import AnalyticsConfig, register_views  # noqa: E402
 from urbanplatform.analytics.benchmark import ExperimentResult, run_experiment  # noqa: E402
-from urbanplatform.analytics.experiments import aqe_sweep, build_experiments  # noqa: E402
+from urbanplatform.analytics.experiments import (  # noqa: E402
+    aqe_sweep,
+    build_experiments,
+    materialisation_sweep,
+)
 from urbanplatform.config import REPO_ROOT, PlatformConfig  # noqa: E402
 from urbanplatform.session import build_session  # noqa: E402
 
 REPORT_DIR = os.path.join(REPO_ROOT, "reports", "query_benchmark")
+
+
+
+def register_products(spark, platform) -> None:
+    """Expose each materialised product as a temp view, as verify_products.py does."""
+    from urbanplatform.analytics.products import ProductsConfig
+
+    products = ProductsConfig.load()
+    for spec in products.products:
+        path = platform.table_path(products.layer, spec.name)
+        if not os.path.isdir(path):
+            raise SystemExit(f"{path} does not exist -- run jobs/run_products.py first")
+        spark.read.format("delta").load(path).createOrReplaceTempView(spec.name)
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,6 +41,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repeats", type=int, default=3, help="timed repeats (default 3)")
     parser.add_argument("--sweep", action="store_true",
                         help="also run AQE on/off across every query in the library")
+    parser.add_argument("--products", action="store_true",
+                        help="also compare each data product against recomputing it "
+                             "(needs jobs/run_products.py to have run)")
     parser.add_argument("--only", nargs="*", help="run only these experiments by name")
     return parser.parse_args()
 
@@ -138,6 +158,8 @@ def main() -> int:
     experiments = build_experiments(analytics)
     if args.sweep:
         experiments += aqe_sweep(analytics)
+    if args.products:
+        experiments += materialisation_sweep(analytics)
     if args.only:
         known = {e.name for e in experiments}
         unknown = [n for n in args.only if n not in known]
@@ -154,6 +176,8 @@ def main() -> int:
     spark = build_session(platform)
     try:
         register_views(spark, platform, analytics)
+        if args.products:
+            register_products(spark, platform)
         results = [run_experiment(spark, e, repeats=args.repeats) for e in experiments]
     finally:
         spark.stop()

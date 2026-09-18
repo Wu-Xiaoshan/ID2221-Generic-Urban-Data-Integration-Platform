@@ -190,3 +190,63 @@ def aqe_sweep(cfg: AnalyticsConfig) -> list[Experiment]:
             )
         )
     return experiments
+
+
+def materialisation_sweep(cfg: AnalyticsConfig) -> list[Experiment]:
+    """Task 5: what a materialised product saves over recomputing it from the trips.
+
+    Each pair answers the same question and returns the same rows. The baseline derives
+    them from the 9.5M-row gold table; the optimised side derives them from the product,
+    which has between 767 and 2,183 rows. The projections match the ones
+    scripts/verify_products.py already proves equal, so a disagreement here is a
+    regression rather than a difference in what was asked.
+    """
+    sql = {q.name: q.sql for q in build_queries(cfg)}
+    min_families = cfg.threshold("min_families_per_zone")
+    min_trips = cfg.threshold("min_trips_per_zone")
+
+    zone_monthly = Experiment(
+        name="product_zone_monthly_statistics",
+        technique="Materialised product vs recomputation",
+        question="What does reading zone_monthly_statistics save over recomputing Q1?",
+        baseline=Variant("compute Q1 from the gold table", [f"""
+            SELECT pickup_year_month, pu_location_id, trip_count, dropoff_count
+            FROM ({sql['q1_zone_monthly_demand']})
+            ORDER BY pickup_year_month, pu_location_id"""]),
+        optimized=Variant("read zone_monthly_statistics", ["""
+            SELECT pickup_year_month, pu_location_id, trip_count, dropoff_count
+            FROM zone_monthly_statistics
+            ORDER BY pickup_year_month, pu_location_id"""]),
+    )
+
+    weather_impact = Experiment(
+        name="product_weather_impact_summary",
+        technique="Materialised product vs recomputation",
+        question="What does weather_impact_summary save over recomputing Q4's ranking?",
+        baseline=Variant("compute Q4 from the gold table", [f"""
+            SELECT pu_location_id, coef_of_variation
+            FROM ({sql['q4_weather_sensitive_zones']})
+            ORDER BY pu_location_id"""]),
+        optimized=Variant("recompute from weather_impact_summary", [f"""
+            SELECT pu_location_id,
+                   ROUND(STDDEV_SAMP(trips_per_hour) / AVG(trips_per_hour), 4) AS coef_of_variation
+            FROM weather_impact_summary
+            GROUP BY pu_location_id
+            HAVING COUNT(*) >= {min_families}
+               AND SUM(trip_count) >= {min_trips}
+            ORDER BY pu_location_id"""]),
+    )
+
+    air_quality = Experiment(
+        name="product_hourly_air_quality_demand",
+        technique="Materialised product vs recomputation",
+        question="What does hourly_air_quality_demand save over recomputing Q3's correlations?",
+        baseline=Variant("compute Q3 from the gold table", [f"""
+            SELECT corr_raw, corr_controlled FROM ({sql['q3_aq_demand_correlation']})"""]),
+        optimized=Variant("recompute from hourly_air_quality_demand", ["""
+            SELECT ROUND(CORR(trip_count, pm25_ugm3), 4)   AS corr_raw,
+                   ROUND(CORR(demand_index, pm25_ugm3), 4) AS corr_controlled
+            FROM hourly_air_quality_demand"""]),
+    )
+
+    return [zone_monthly, weather_impact, air_quality]

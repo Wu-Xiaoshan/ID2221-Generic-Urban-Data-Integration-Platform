@@ -1,0 +1,66 @@
+# aqe_q1_zone_demand_one_month / AQE on
+
+== Physical Plan ==
+AdaptiveSparkPlan (10)
++- Sort (9)
+   +- Exchange (8)
+      +- SortAggregate (7)
+         +- Sort (6)
+            +- Exchange (5)
+               +- SortAggregate (4)
+                  +- Sort (3)
+                     +- Filter (2)
+                        +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [4]: [pu_location_id#49, pickup_borough#91, pickup_zone#92, pickup_year_month#70]
+Batched: true
+Location: PreparedDeltaFileIndex [file:/D:/master/second-year/Data-Intensive/Assignment/w1/ID2221-Generic-Urban-Data-Integration-Platform/data/lakehouse/gold/integrated_taxi_trips]
+PartitionFilters: [isnotnull(pickup_year_month#70), (pickup_year_month#70 = 2024-02)]
+PushedFilters: [Not(In(pu_location_id, [264,265]))]
+ReadSchema: struct<pu_location_id:int,pickup_borough:string,pickup_zone:string>
+
+(2) Filter
+Input [4]: [pu_location_id#49, pickup_borough#91, pickup_zone#92, pickup_year_month#70]
+Condition : NOT pu_location_id#49 IN (264,265)
+
+(3) Sort
+Input [4]: [pu_location_id#49, pickup_borough#91, pickup_zone#92, pickup_year_month#70]
+Arguments: [pickup_year_month#70 ASC NULLS FIRST, pu_location_id#49 ASC NULLS FIRST], false, 0
+
+(4) SortAggregate
+Input [4]: [pu_location_id#49, pickup_borough#91, pickup_zone#92, pickup_year_month#70]
+Keys [2]: [pickup_year_month#70, pu_location_id#49]
+Functions [3]: [partial_max(pickup_zone#92), partial_max(pickup_borough#91), partial_count(1)]
+Aggregate Attributes [3]: [max#47724, max#47725, count#47726L]
+Results [5]: [pickup_year_month#70, pu_location_id#49, max#47727, max#47728, count#47729L]
+
+(5) Exchange
+Input [5]: [pickup_year_month#70, pu_location_id#49, max#47727, max#47728, count#47729L]
+Arguments: hashpartitioning(pickup_year_month#70, pu_location_id#49, 8), ENSURE_REQUIREMENTS, [plan_id=31697]
+
+(6) Sort
+Input [5]: [pickup_year_month#70, pu_location_id#49, max#47727, max#47728, count#47729L]
+Arguments: [pickup_year_month#70 ASC NULLS FIRST, pu_location_id#49 ASC NULLS FIRST], false, 0
+
+(7) SortAggregate
+Input [5]: [pickup_year_month#70, pu_location_id#49, max#47727, max#47728, count#47729L]
+Keys [2]: [pickup_year_month#70, pu_location_id#49]
+Functions [3]: [max(pickup_zone#92), max(pickup_borough#91), count(1)]
+Aggregate Attributes [3]: [max(pickup_zone#92)#47642, max(pickup_borough#91)#47643, count(1)#47644L]
+Results [5]: [pickup_year_month#70, pu_location_id#49, max(pickup_zone#92)#47642 AS pickup_zone#47571, max(pickup_borough#91)#47643 AS pickup_borough#47572, count(1)#47644L AS trip_count#47573L]
+
+(8) Exchange
+Input [5]: [pickup_year_month#70, pu_location_id#49, pickup_zone#47571, pickup_borough#47572, trip_count#47573L]
+Arguments: rangepartitioning(trip_count#47573L DESC NULLS LAST, 8), ENSURE_REQUIREMENTS, [plan_id=31701]
+
+(9) Sort
+Input [5]: [pickup_year_month#70, pu_location_id#49, pickup_zone#47571, pickup_borough#47572, trip_count#47573L]
+Arguments: [trip_count#47573L DESC NULLS LAST], true, 0
+
+(10) AdaptiveSparkPlan
+Output [5]: [pickup_year_month#70, pu_location_id#49, pickup_zone#47571, pickup_borough#47572, trip_count#47573L]
+Arguments: isFinalPlan=false
+
+
