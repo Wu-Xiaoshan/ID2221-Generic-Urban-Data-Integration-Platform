@@ -61,7 +61,7 @@ python jobs/run_queries.py --explain q2_weather_distance_silver
 ```
 
 The query design (grain, filters, normalisation, and the measurements behind each threshold) is in
-`DesignReportWeek2.docx`. Bucket edges, the weather-code families and the support thresholds are
+`DesignReportWeek2.pdf`. Bucket edges, the weather-code families and the support thresholds are
 configuration, in `conf/analytics.yaml`; the SQL hard-codes none of them.
 
 The timings `run_queries.py` prints come from a single cold run with no warm-up and no repeats. They
@@ -101,7 +101,7 @@ Output goes to `reports/query_benchmark/`: `measurements.md` with the timings an
 `EXPLAIN FORMATTED` reports the plan *before* execution: under AQE that is `isFinalPlan=false` and
 shows none of AQE's rewrites, so the executed plan is captured afterwards as `.final.txt`.
 
-The analysis is in `BenchmarkReportWeek2.docx`.
+The analysis is in `BenchmarkReportWeek2.pdf`.
 
 ## Analytical data products (Week 2)
 
@@ -147,8 +147,8 @@ Q4's ranking and Q3's correlations must come out the same when recomputed from
 ## Project layout
 
 ```
-DesignReportWeek2.docx        the design report, also as .pdf
-BenchmarkReportWeek2.docx     the benchmark report, also as .pdf
+DesignReportWeek2.pdf         the design report
+BenchmarkReportWeek2.pdf      the benchmark report
 README.md                     this file
 conf/
   platform.yaml               Spark settings and the lakehouse root

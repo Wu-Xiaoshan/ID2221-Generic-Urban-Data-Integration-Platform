@@ -3,6 +3,10 @@
 *.pdf
 !/DesignReportWeek2.pdf
 !/BenchmarkReportWeek2.pdf
+# The Word sources of those two PDFs stay on disk: they cannot be merged, so the PDF
+# is what this repository hands in.
+/DesignReportWeek2.docx
+/BenchmarkReportWeek2.docx
 /Assignment-week2.md
 
 # Source datasets: downloaded, not authored here (~2.4 GB).
