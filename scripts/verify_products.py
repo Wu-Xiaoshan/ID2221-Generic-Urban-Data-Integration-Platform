@@ -21,7 +21,6 @@ from urbanplatform.analytics.products import ProductsConfig  # noqa: E402
 from urbanplatform.config import PlatformConfig  # noqa: E402
 from urbanplatform.session import build_session  # noqa: E402
 
-WINDOW_DAYS = 91  # 2024-01-01 .. 2024-03-31, New York local
 REQUIRED_PROPERTIES = ("source", "source_version", "created_at", "refreshed_at", "schema_version")
 
 
@@ -100,7 +99,9 @@ def main() -> int:
         check("daily_mobility_summary conservation", daily_total == located,
               f"sums to {daily_total:,}, gold has {located:,} located pickups")
         days = scalar("SELECT COUNT(DISTINCT pickup_date) FROM daily_mobility_summary")
-        check("daily_mobility_summary coverage", days == WINDOW_DAYS, f"{days} days")
+        gold_days = scalar("SELECT COUNT(DISTINCT pickup_date) FROM trips")
+        check("daily_mobility_summary coverage", days == gold_days,
+              f"{days} days, gold has trips on {gold_days}")
 
         # zone_monthly_statistics: identical demand to Q1.
         q1 = {(r["pickup_year_month"], r["pu_location_id"]): (r["trip_count"], r["dropoff_count"])

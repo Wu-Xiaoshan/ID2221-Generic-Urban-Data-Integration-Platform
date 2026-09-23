@@ -16,9 +16,16 @@ def register_sources(spark: SparkSession, platform: PlatformConfig, cfg: Analyti
         spark.read.format("delta").load(path).createOrReplaceTempView(f"src_{name}")
 
 
-def enriched_trips_sql(cfg: AnalyticsConfig) -> str:
-    """gold/integrated_taxi_trips + the derived dimensions the analyses share."""
+def enriched_trips_sql(cfg: AnalyticsConfig, months: list[str] | None = None) -> str:
+    """gold/integrated_taxi_trips + the derived dimensions the analyses share.
+
+    ``months`` restricts the view to those pickup_year_month partitions. An incremental
+    product refresh uses it to run a product's unchanged SQL over the changed months only.
+    """
     tz = cfg.reporting_timezone
+    where = ""
+    if months:
+        where = "WHERE pickup_year_month IN (" + ", ".join(f"'{m}'" for m in months) + ")"
     return f"""
     CREATE OR REPLACE TEMP VIEW trips AS
     SELECT
@@ -33,6 +40,7 @@ def enriched_trips_sql(cfg: AnalyticsConfig) -> str:
         {bucket_case("aq_pm25_ugm3", cfg.aq_quartiles)}               AS aq_quartile,
         {bucket_case("aq_pm25_ugm3", cfg.aq_epa_categories)}          AS aq_epa_category
     FROM src_integrated
+    {where}
     """
 
 
@@ -61,7 +69,12 @@ def hourly_demand_sql(cfg: AnalyticsConfig) -> str:
     """
 
 
-def register_views(spark: SparkSession, platform: PlatformConfig, cfg: AnalyticsConfig) -> None:
+def register_views(
+    spark: SparkSession,
+    platform: PlatformConfig,
+    cfg: AnalyticsConfig,
+    months: list[str] | None = None,
+) -> None:
     register_sources(spark, platform, cfg)
-    spark.sql(enriched_trips_sql(cfg))
+    spark.sql(enriched_trips_sql(cfg, months))
     spark.sql(hourly_demand_sql(cfg))

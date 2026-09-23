@@ -24,9 +24,19 @@ def build_queries(cfg: AnalyticsConfig) -> list[QueryDef]:
     min_trips_zone = cfg.threshold("min_trips_per_zone")
     peak_n = cfg.threshold("peak_hours_per_day")
 
+    # Days with at least one pickup in each month, the denominator of trips per day. For a
+    # complete month it is the calendar length; for a month still being loaded, such as the
+    # first week of April in release v2, it is the days loaded so far.
+    month_days_cte = """month_days AS (
+        SELECT pickup_year_month, COUNT(DISTINCT pickup_date) AS days
+        FROM trips
+        GROUP BY pickup_year_month
+    )"""
+
     # Q1
     q1 = f"""
-    WITH pickups AS (
+    WITH {month_days_cte},
+    pickups AS (
         SELECT pickup_year_month,
                pu_location_id            AS location_id,
                MAX(pickup_zone)          AS zone,
@@ -50,15 +60,14 @@ def build_queries(cfg: AnalyticsConfig) -> list[QueryDef]:
            p.borough     AS pickup_borough,
            p.trip_count,
            COALESCE(d.dropoff_count, 0) AS dropoff_count,
-           ROUND(p.trip_count
-                 / DAY(LAST_DAY(TO_DATE(CONCAT(p.pickup_year_month, '-01')))), 1)
-               AS trips_per_day,
+           ROUND(p.trip_count / m.days, 1) AS trips_per_day,
            ROUND(100.0 * p.trip_count
                  / SUM(p.trip_count) OVER (PARTITION BY p.pickup_year_month, p.borough), 2)
                AS share_of_borough_pct,
            RANK() OVER (PARTITION BY p.pickup_year_month ORDER BY p.trip_count DESC)
                AS rank_in_month
     FROM pickups p
+    JOIN month_days m ON p.pickup_year_month = m.pickup_year_month
     LEFT JOIN dropoffs d
            ON p.pickup_year_month = d.pickup_year_month
           AND p.location_id       = d.location_id
@@ -271,15 +280,16 @@ def build_queries(cfg: AnalyticsConfig) -> list[QueryDef]:
 
     # Q6
     q6_monthly = f"""
-    WITH monthly AS (
-        SELECT pickup_year_month,
-               pickup_borough,
-               COUNT(*) AS trip_count,
-               COUNT(*) / DAY(LAST_DAY(TO_DATE(CONCAT(pickup_year_month, '-01'))))
-                   AS trips_per_day
-        FROM trips
-        WHERE pu_location_id NOT IN ({sentinels})
-        GROUP BY pickup_year_month, pickup_borough
+    WITH {month_days_cte},
+    monthly AS (
+        SELECT t.pickup_year_month,
+               t.pickup_borough,
+               COUNT(*)              AS trip_count,
+               COUNT(*) / MAX(d.days) AS trips_per_day
+        FROM trips t
+        JOIN month_days d ON t.pickup_year_month = d.pickup_year_month
+        WHERE t.pu_location_id NOT IN ({sentinels})
+        GROUP BY t.pickup_year_month, t.pickup_borough
     )
     SELECT pickup_year_month,
            pickup_borough,

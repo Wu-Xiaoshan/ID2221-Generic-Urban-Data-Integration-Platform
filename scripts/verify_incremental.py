@@ -53,22 +53,23 @@ class Checks:
 _MAINTENANCE = {"OPTIMIZE", "SET TBLPROPERTIES", "VACUUM START", "VACUUM END"}
 
 
-def release_merges(spark, path: str) -> list[dict]:
+def release_merges(spark, path: str):
     """The merge commits since the table was last loaded or restored, oldest first.
 
     Walking back from the latest commit, merges are collected and maintenance commits
     skipped. Anything else (the initial WRITE, a RESTORE, a full re-ingest) ends the
-    walk, because it produced the state the merges were applied to.
+    walk, because it produced the state the merges were applied to. Its timestamp is
+    returned too: runs recorded before it belong to an earlier state of the table.
     """
     from delta.tables import DeltaTable
 
     history = (
         DeltaTable.forPath(spark, path).history()
-        .select("version", "operation", "operationMetrics")
+        .select("version", "timestamp", "operation", "operationMetrics")
         .orderBy(F.desc("version"))
         .collect()
     )
-    merges = []
+    merges, baseline_at = [], None
     for row in history:
         if row["operation"] == "MERGE":
             metrics = row["operationMetrics"] or {}
@@ -78,8 +79,9 @@ def release_merges(spark, path: str) -> list[dict]:
                 "inserted": int(metrics.get("numTargetRowsInserted", 0)),
             })
         elif row["operation"] not in _MAINTENANCE:
+            baseline_at = row["timestamp"]
             break
-    return sorted(merges, key=lambda m: m["version"])
+    return sorted(merges, key=lambda m: m["version"]), baseline_at
 
 
 def write_report(release: str, checks: Checks, facts: dict[str, dict], path: str) -> None:
@@ -138,7 +140,7 @@ def main(argv: list[str]) -> int:
             check.dataset = name
             print(f"\n--- {name}  ({cfg.target.table}, key {', '.join(key)})")
 
-            merges = release_merges(spark, path)
+            merges, baseline_at = release_merges(spark, path)
             check("applied", merges, f"{len(merges)} merge commit(s) in the table history")
             if not merges:
                 continue
@@ -203,6 +205,8 @@ def main(argv: list[str]) -> int:
             rejected, runs = "n/a", []
             if metadata is not None:
                 runs = metadata.filter(F.col("dataset_name") == name).orderBy("started_at").collect()
+                if baseline_at is not None:
+                    runs = [r for r in runs if r["started_at"] >= baseline_at]
             if runs:
                 rejected = runs[0]["records_rejected"]
                 check("expected rejected", rejected == expected["rejected_by_quality_rules"],

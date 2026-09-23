@@ -76,22 +76,95 @@ def enable_change_data_feed(spark: SparkSession, path: str) -> None:
         )
 
 
-def _inserted_partitions(spark: SparkSession, target: TargetSpec, path: str, version: int) -> str | None:
-    """A predicate matching the partitions that commit ``version`` inserted rows into."""
-    changes = (
+def table_version(spark: SparkSession, path: str) -> int:
+    from delta.tables import DeltaTable
+
+    return int(DeltaTable.forPath(spark, path).history(1).first()["version"])
+
+
+def table_properties(spark: SparkSession, path: str) -> dict[str, str]:
+    from delta.tables import DeltaTable
+
+    return dict(DeltaTable.forPath(spark, path).detail().first()["properties"] or {})
+
+
+def set_table_properties(spark: SparkSession, path: str, props: dict[str, str]) -> None:
+    def literal(value: str) -> str:
+        return "'" + str(value).replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+    pairs = ", ".join(f"{literal(k)} = {literal(v)}" for k, v in props.items())
+    spark.sql(f"ALTER TABLE delta.`{_sql_path(path)}` SET TBLPROPERTIES ({pairs})")
+
+
+def read_changes(spark: SparkSession, path: str, start: int, end: int) -> DataFrame:
+    """The Change Data Feed of commits ``start`` to ``end``, both included.
+
+    Raises if the feed does not cover that range, for instance because it was switched on
+    later. Callers treat that as "the changes are unknown" and fall back to a full rebuild.
+    """
+    return (
         spark.read.format("delta")
         .option("readChangeFeed", "true")
-        .option("startingVersion", version)
-        .option("endingVersion", version)
+        .option("startingVersion", start)
+        .option("endingVersion", end)
         .load(path)
-        .filter(F.col("_change_type") == "insert")
     )
-    partitions = changes.select(*target.partition_by).distinct().collect()
-    if not partitions:
+
+
+# Operations that replace a table's contents wholesale. Their change feed lists every row
+# as deleted and inserted again, so reading it costs more than rebuilding downstream.
+_REPLACING_OPERATIONS = {"CREATE OR REPLACE TABLE AS SELECT", "REPLACE TABLE AS SELECT"}
+
+
+def replaced_between(spark: SparkSession, path: str, start: int, end: int) -> str | None:
+    """The first commit in ``start``..``end`` that overwrote the whole table, if any."""
+    from delta.tables import DeltaTable
+
+    history = (
+        DeltaTable.forPath(spark, path).history()
+        .filter((F.col("version") >= start) & (F.col("version") <= end))
+        .orderBy("version")
+        .collect()
+    )
+    for row in history:
+        params = row["operationParameters"] or {}
+        if row["operation"] in _REPLACING_OPERATIONS or (
+            row["operation"] == "WRITE" and params.get("mode") == "Overwrite"
+        ):
+            return f"v{row['version']} {row['operation']}"
+    return None
+
+
+def merge_commit(spark: SparkSession, path: str, after_version: int):
+    """The first MERGE committed after ``after_version``, or None if the merge committed nothing.
+
+    Looked up by operation, not taken as the latest commit: auto-compaction can commit an
+    OPTIMIZE straight after the merge, and that commit carries no merge metrics.
+    """
+    from delta.tables import DeltaTable
+
+    return (
+        DeltaTable.forPath(spark, path).history()
+        .filter((F.col("version") > after_version) & (F.col("operation") == "MERGE"))
+        .orderBy("version")
+        .first()
+    )
+
+
+def partition_predicate(columns: list[str], rows) -> str | None:
+    """A predicate matching the given partition values, for OPTIMIZE or replaceWhere."""
+    if not rows:
         return None
     return " OR ".join(
-        "(" + " AND ".join(f"`{c}` = '{row[c]}'" for c in target.partition_by) + ")"
-        for row in partitions
+        "(" + " AND ".join(f"`{c}` = '{row[c]}'" for c in columns) + ")" for row in rows
+    )
+
+
+def _inserted_partitions(spark: SparkSession, target: TargetSpec, path: str, version: int) -> str | None:
+    """A predicate matching the partitions that commit ``version`` inserted rows into."""
+    changes = read_changes(spark, path, version, version).filter(F.col("_change_type") == "insert")
+    return partition_predicate(
+        target.partition_by, changes.select(*target.partition_by).distinct().collect()
     )
 
 
@@ -136,14 +209,7 @@ def merge_delta(spark: SparkSession, df: DataFrame, target: TargetSpec, path: st
     finally:
         spark.conf.set(_AUTO_MERGE, previous)
 
-    # Looked up by operation, not taken as the latest commit: auto-compaction can commit
-    # an OPTIMIZE straight after the merge, and that commit carries no merge metrics.
-    commit = (
-        DeltaTable.forPath(spark, path).history()
-        .filter((F.col("version") > before) & (F.col("operation") == "MERGE"))
-        .orderBy("version")
-        .first()
-    )
+    commit = merge_commit(spark, path, before)
     if commit is None:
         # Delta commits nothing when every source row matched, as on a re-applied
         # release, so there are no metrics and the source is counted directly.

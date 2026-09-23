@@ -25,6 +25,9 @@ def main() -> int:
 
     print("\n" + "=" * 68)
     print(f"integration run {run.run_id}: {run.status}")
+    if run.source_versions:
+        versions = ", ".join(f"{t} v{v}" for t, v in run.source_versions.items())
+        print(f"  built from           {versions}")
     if run.status == "success":
         print(f"  trips in / out       {run.trips_in:,} / {run.trips_out:,}")
         print(f"  unlocated trips      {run.unlocated_trips:,}")

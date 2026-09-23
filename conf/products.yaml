@@ -11,6 +11,12 @@ thresholds:
 
 # schema_version is declared, not derived: bump it whenever a product's columns change.
 # The job refuses to overwrite a table whose columns changed under an unchanged version.
+#
+# refresh says what jobs/run_refresh.py recomputes when the gold table changes.
+#   incremental  every value depends only on trips of the same month, so only the months
+#                whose trips changed are recomputed
+#   full         some value is computed over the whole period, so any change to the trips
+#                can change every row
 products:
   daily_mobility_summary:
     description: Daily trips, distance, duration and revenue per pickup borough, with that day's weather and PM2.5.
@@ -20,6 +26,8 @@ products:
     key: [pickup_date, pickup_borough]
     # Time-grained products grow by one month per load; the month is also how they are read.
     partition_by: [pickup_year_month]
+    # Shares, averages and the day's weather are all per day.
+    refresh: incremental
 
   zone_monthly_statistics:
     description: Q1's monthly pickup demand per zone, extended with trip profile and peak hour.
@@ -28,6 +36,8 @@ products:
     schema_version: "1.0"
     key: [pickup_year_month, pu_location_id]
     partition_by: [pickup_year_month]
+    # Ranks, borough shares and trips per day are all taken within the month.
+    refresh: incremental
 
   weather_impact_summary:
     description: Pickups per hour of each weather family for every zone, and how far each deviates from the zone's mean.
@@ -37,6 +47,9 @@ products:
     key: [pu_location_id, weather_family]
     # ~1,200 rows with no time dimension: one file, nothing to partition on.
     partition_by: []
+    # Trips per hour divides by the hours each weather family occurred over the whole
+    # period, and the demand index compares it with the zone's mean over all families.
+    refresh: full
 
   hourly_air_quality_demand:
     description: City-wide pickups per hour with PM2.5, its quartile and EPA category, and demand normalised for time of day.
@@ -45,3 +58,6 @@ products:
     schema_version: "1.0"
     key: [pickup_hour]
     partition_by: [pickup_year_month]
+    # demand_index divides each hour's trips by the mean of all hours with the same local
+    # hour and day type, so new hours change the index of every existing hour.
+    refresh: full

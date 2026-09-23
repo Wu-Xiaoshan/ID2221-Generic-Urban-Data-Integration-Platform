@@ -28,6 +28,10 @@ class ProductSpec:
     key: list[str]
     partition_by: list[str] = field(default_factory=list)
     zorder_by: list[str] = field(default_factory=list)
+    # incremental: every row depends only on trips of its own partition, so a refresh
+    # recomputes only the partitions whose trips changed. full: some value is computed
+    # over the whole period, so any change to the trips means recomputing everything.
+    refresh: str = "full"
 
 
 @dataclass(frozen=True)
@@ -51,6 +55,14 @@ class ProductsConfig:
                     f"product '{name}' in conf/products.yaml has no SQL in products.py; "
                     f"known: {', '.join(SQL_BUILDERS)}"
                 )
+            refresh = spec.get("refresh", "full")
+            if refresh not in ("full", "incremental"):
+                raise ValueError(f"product '{name}': refresh must be 'full' or 'incremental'")
+            if refresh == "incremental" and list(spec.get("partition_by") or []) != ["pickup_year_month"]:
+                raise ValueError(
+                    f"product '{name}': incremental refresh works per pickup_year_month partition, "
+                    "so the product must be partitioned by it"
+                )
             products.append(
                 ProductSpec(
                     name=name,
@@ -61,6 +73,7 @@ class ProductsConfig:
                     key=list(spec["key"]),
                     partition_by=list(spec.get("partition_by") or []),
                     zorder_by=list(spec.get("zorder_by") or []),
+                    refresh=refresh,
                 )
             )
         return ProductsConfig(

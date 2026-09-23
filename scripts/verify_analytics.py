@@ -11,9 +11,6 @@ from urbanplatform.analytics import AnalyticsConfig, build_queries, register_vie
 from urbanplatform.config import PlatformConfig  # noqa: E402
 from urbanplatform.session import build_session  # noqa: E402
 
-WEEK1_ROW_COUNT = 9_551_907  # as reported by jobs/run_ingest.py, see README
-WINDOW_DAYS = 91  # 2024-01-01 .. 2024-03-31, New York local
-
 
 class Checks:
     def __init__(self) -> None:
@@ -41,9 +38,16 @@ def main() -> int:
         rows = lambda s: spark.sql(s).collect()  # noqa: E731
         scalar = lambda s: rows(s)[0][0]  # noqa: E731
 
+        # Gold must hold every silver trip exactly once, however many releases were applied.
         total = scalar("SELECT COUNT(*) FROM trips")
-        check("gold row count", total == WEEK1_ROW_COUNT,
-              f"{total:,} (Week 1 reported {WEEK1_ROW_COUNT:,})")
+        silver = spark.read.format("delta").load(platform.table_path("silver", "taxi_trips")).count()
+        check("gold row count", total == silver, f"{total:,} in gold, {silver:,} in silver")
+
+        # The window is whatever the data covers; the checks below need it to have no gaps.
+        window_days = scalar("SELECT DATEDIFF(MAX(pickup_date), MIN(pickup_date)) + 1 FROM trips")
+        observed_days = scalar("SELECT COUNT(DISTINCT pickup_date) FROM trips")
+        check("date coverage", observed_days == window_days,
+              f"{observed_days} days with trips in a {window_days}-day window")
 
         # Q1 must account for every non-sentinel pickup exactly once: no double counting
         q1_sum = sum(r["trip_count"] for r in rows(sql["q1_zone_monthly_demand"]))
@@ -65,7 +69,7 @@ def main() -> int:
         occurrences = rows("""SELECT day_of_week_num, COUNT(DISTINCT pickup_date) AS n
                               FROM trips GROUP BY day_of_week_num""")
         counts = sorted(r["n"] for r in occurrences)
-        check("Q5 weekday occurrences", sum(counts) == WINDOW_DAYS,
+        check("Q5 weekday occurrences", sum(counts) == window_days,
               f"{sum(counts)} days, per weekday {counts}")
 
         hourly = scalar("SELECT COUNT(*) FROM hourly_demand")
@@ -85,7 +89,7 @@ def main() -> int:
               f"{len(q4)} zones survive; all clear the configured floors")
 
         daily = rows(sql["q6_daily_trend"])
-        check("Q6 daily coverage", len(daily) == WINDOW_DAYS, f"{len(daily)} daily rows")
+        check("Q6 daily coverage", len(daily) == window_days, f"{len(daily)} daily rows")
 
         # The pre-joined and query-time-joined implementations of Q2 must agree.
         gold_rows = rows(sql["q2_weather_distance"])

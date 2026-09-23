@@ -6,6 +6,8 @@ description: One row per taxi trip, enriched with pickup-hour weather and air qu
 
 fact:
   table: taxi_trips          # silver
+  # One gold row per fact row. The incremental refresh matches gold to silver on it.
+  key: trip_id
   # UTC, hour-truncated. Derived in the taxi_trips transform precisely so that this
   # join is possible; see docs/common_data_model.md section 1.1.
   hour_column: pickup_hour
