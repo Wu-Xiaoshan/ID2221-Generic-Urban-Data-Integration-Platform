@@ -83,9 +83,8 @@ python scripts/verify_incremental.py v2       # checks the result, writes report
 
 `reports/updates/v2.md` describes how each file was generated and what the pipeline should do with
 it. The generator is seeded, so the files are identical on every run and are not committed.
-`--new-frac`, `--dup-frac` and `--dup-base` change the proportions. The assignment asks for 1-2%
-duplicate trips without saying of what, so by default they are 1.5% of the update file;
-`--dup-base original` takes 1.5% of the original trips instead.
+`--new-frac`, `--dup-frac` and `--dup-base` change the proportions. By default the duplicates are
+1.5% of the update file; `--dup-base original` makes them 1.5% of the original trips instead.
 
 `run_update.py` runs each dataset through the same pipeline as the initial load (schema check,
 standardisation, transforms, quality rules) and then merges the result into the existing table:

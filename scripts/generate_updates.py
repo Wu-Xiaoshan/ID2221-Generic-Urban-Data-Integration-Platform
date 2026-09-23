@@ -514,14 +514,11 @@ def write_report(manifest: dict, path: str) -> None:
 
     taxi = ds.get("taxi_trips")
     if taxi:
-        base = ("of the update file" if taxi["duplicate_base"] == "update"
-                else "of the original dataset")
         lines += [
             "",
             f"The taxi file holds {taxi['new_share_of_original']:.2%} new trips relative to "
             f"the {taxi['original_records']:,} original trips. Its duplicates make up "
-            f"{taxi['duplicate_share_of_file']:.2%} of the file. The assignment asks for "
-            f"1-2% duplicates without naming the base; here the percentage is taken {base}.",
+            f"{taxi['duplicate_share_of_file']:.2%} of the file.",
         ]
 
     lines += ["", "## Per dataset", ""]
