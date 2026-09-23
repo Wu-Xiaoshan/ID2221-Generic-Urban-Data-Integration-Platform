@@ -84,10 +84,16 @@ quality:
     # rush-hour trips -- because local 20:00 is already 00:00Z the next day. Padding
     # them by a day instead let a single 00:34 trip on 1 April through, which created a
     # fourth partition holding one row: exactly the failure this rule exists to prevent.
+    #
+    # Release v2 extends the coverage to 7 April local, so the upper bound is now
+    # 2024-04-08T00:00 EDT = 04:00Z. Each release that extends coverage has to move
+    # this bound by hand; that is the price of a window tight enough to catch corrupt
+    # timestamps. A full re-ingest of the original files alone now also keeps the two
+    # trips on 1 April, which is right now that April is a covered month.
     - type: timestamp_window
       column: pickup_ts
       min: "2024-01-01 05:00:00"
-      max: "2024-04-01 04:00:00"
+      max: "2024-04-08 04:00:00"
       name: pickup_outside_window
 
     - type: range
@@ -132,3 +138,9 @@ target:
   # below one target file; see the storage architecture section of the design report.
   partition_by: [pickup_year_month]
   zorder_by: [pu_location_id]
+
+# Incremental releases (jobs/run_update.py). trip_id is a content hash, so a re-delivered
+# trip carries the same key as the stored one and the merge ignores it.
+incremental:
+  path: data/updates/{release}/taxi_trips/*.parquet
+  merge_key: [trip_id]

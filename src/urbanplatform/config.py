@@ -7,7 +7,7 @@ module, or in any other module except ``transforms/``, knows the name of any dat
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import yaml
@@ -109,10 +109,26 @@ class SourceSpec:
 class TargetSpec:
     table: str
     layer: str = "silver"
+    # overwrite, append, or merge. merge is set only by DatasetConfig.for_release.
     mode: str = "overwrite"
     partition_by: list[str] = field(default_factory=list)
     zorder_by: list[str] = field(default_factory=list)
     replace_where: str | None = None
+    merge_key: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class IncrementalSpec:
+    """Where a dataset's incremental releases arrive, and what identifies a row.
+
+    ``path`` contains ``{release}``, filled in from the command line. ``merge_key`` is
+    at the grain of the *target* table, which is not always the grain of the source:
+    air_quality's source rows are individual monitor readings, but its silver table
+    holds one row per hour.
+    """
+
+    path: str
+    merge_key: list[str]
 
 
 @dataclass(frozen=True)
@@ -129,6 +145,21 @@ class DatasetConfig:
     cast: dict[str, str] = field(default_factory=dict)
     primary_key: list[str] = field(default_factory=list)
     rules: list[QualityRule] = field(default_factory=list)
+    incremental: IncrementalSpec | None = None
+
+    def for_release(self, release: str) -> DatasetConfig:
+        """This dataset, read from one incremental release and merged into its table.
+
+        Everything else (schema checks, standardisation, transforms, quality rules) is
+        unchanged, so an update goes through exactly the pipeline the initial load did.
+        """
+        if self.incremental is None:
+            raise ValueError(f"[{self.name}] has no incremental section")
+        return replace(
+            self,
+            source=replace(self.source, path=self.incremental.path.format(release=release)),
+            target=replace(self.target, mode="merge", merge_key=self.incremental.merge_key),
+        )
 
     @staticmethod
     def load(path: str) -> DatasetConfig:
@@ -136,6 +167,7 @@ class DatasetConfig:
             raw = yaml.safe_load(fh)
 
         quality = raw.get("quality", {}) or {}
+        incremental = raw.get("incremental")
         return DatasetConfig(
             name=raw["name"],
             description=raw.get("description", ""),
@@ -152,6 +184,11 @@ class DatasetConfig:
             cast=raw.get("cast", {}) or {},
             primary_key=quality.get("primary_key", []) or [],
             rules=[QualityRule.parse(r) for r in (quality.get("rules", []) or [])],
+            incremental=(
+                IncrementalSpec(path=incremental["path"], merge_key=list(incremental["merge_key"]))
+                if incremental
+                else None
+            ),
         )
 
 

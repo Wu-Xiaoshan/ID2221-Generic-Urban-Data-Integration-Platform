@@ -64,6 +64,10 @@ cast:
   latitude: double
   longitude: double
   poc: int
+  # Added by release v2. The file is read without inferSchema, so it arrives as a
+  # string. A cast of a column that is not there is skipped, so the original extract
+  # is unaffected.
+  aqi: int
 
 drop:
   - date_local
@@ -87,10 +91,12 @@ quality:
       columns: [site_id, parameter_code, poc, obs_ts]
       name: duplicate_reading
 
+    # Extended by release v2, which covers January 2025 in local time, so up to
+    # 2025-02-01 04:00 GMT. Same day of slack as before.
     - type: timestamp_window
       column: obs_ts
       min: "2024-01-01"
-      max: "2025-01-02"
+      max: "2025-02-02"
       name: obs_outside_window
 
     # PM2.5 cannot be negative. The upper bound is far above New York's worst recorded
@@ -113,3 +119,11 @@ target:
   mode: overwrite
   # 8,784 rows after the city-wide hourly aggregation.
   partition_by: []
+
+# Incremental releases (jobs/run_update.py). The key is the hour, the grain of the
+# table, not the per-reading primary key above. A late reading for an hour that is
+# already in the table is therefore ignored rather than folded into that hour's
+# average: the table keeps no readings to recompute it from.
+incremental:
+  path: data/updates/{release}/air_quality/*.csv
+  merge_key: [obs_hour]

@@ -43,6 +43,11 @@ INGESTION_METADATA_SCHEMA = StructType(
         StructField("write_mode", StringType(), True),
         StructField("partition_by", StringType(), True),
         StructField("error", StringType(), True),
+        # Added in Week 3 for incremental updates. Rows written before then read them
+        # as null. For a merge, records_written equals records_inserted.
+        StructField("release", StringType(), True),
+        StructField("records_inserted", LongType(), True),
+        StructField("records_duplicate", LongType(), True),
     ]
 )
 
@@ -70,6 +75,9 @@ class IngestionRun:
     write_mode: str | None = None
     partition_by: str | None = None
     error: str | None = None
+    release: str | None = None
+    records_inserted: int | None = None
+    records_duplicate: int | None = None
     rejections_by_rule: dict[str, int] = field(default_factory=dict)
 
     def set_schema_report(self, report: dict) -> None:
@@ -87,7 +95,9 @@ class IngestionRun:
 def write_metadata(spark: SparkSession, runs: list[IngestionRun], path: str) -> None:
     rows = [run.to_row() for run in runs]
     df = spark.createDataFrame(rows, schema=INGESTION_METADATA_SCHEMA)
-    df.write.format("delta").mode("append").save(path)
+    # mergeSchema lets a table written by an older version of this schema gain the new
+    # columns on its next append, instead of refusing the write.
+    df.write.format("delta").mode("append").option("mergeSchema", "true").save(path)
 
 
 def write_quarantine(quarantined: DataFrame, path: str) -> None:

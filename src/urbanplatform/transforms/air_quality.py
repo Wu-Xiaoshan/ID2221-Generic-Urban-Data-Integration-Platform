@@ -42,15 +42,21 @@ def aggregate_city_hourly(df: DataFrame, cfg: DatasetConfig) -> DataFrame:
     A city-wide mean rather than a per-zone value is a deliberate limit. Six monitors
     serve 265 taxi zones, and Manhattan — where most pickups happen — has none, so
     assigning each trip its nearest monitor would look precise without being so.
+
+    ``aqi`` arrived with release v2. Because this function changes the grain, a new
+    source column only reaches the table if it is given an aggregate here: unlike a
+    new weather column, it cannot flow through on its own. The city-wide value is the
+    worst monitor's, following the EPA convention that an area's AQI is its highest
+    reading, not the mean. It is aggregated only when present, so a full re-ingest of
+    the original extract, which has no aqi, still works.
     """
-    return (
-        df.groupBy("obs_hour")
-        .agg(
-            F.avg("pm25_ugm3_raw").alias("pm25_ugm3"),
-            F.min("pm25_ugm3_raw").alias("pm25_min_ugm3"),
-            F.max("pm25_ugm3_raw").alias("pm25_max_ugm3"),
-            F.countDistinct("site_id").alias("site_count"),
-            F.count(F.lit(1)).alias("reading_count"),
-        )
-        .withColumn("obs_date", F.to_date("obs_hour"))
-    )
+    aggregates = [
+        F.avg("pm25_ugm3_raw").alias("pm25_ugm3"),
+        F.min("pm25_ugm3_raw").alias("pm25_min_ugm3"),
+        F.max("pm25_ugm3_raw").alias("pm25_max_ugm3"),
+        F.countDistinct("site_id").alias("site_count"),
+        F.count(F.lit(1)).alias("reading_count"),
+    ]
+    if "aqi" in df.columns:
+        aggregates.append(F.max("aqi").alias("aqi"))
+    return df.groupBy("obs_hour").agg(*aggregates).withColumn("obs_date", F.to_date("obs_hour"))

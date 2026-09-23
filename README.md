@@ -144,6 +144,65 @@ source. The daily trips must add up to the gold table, and `zone_monthly_statist
 Q4's ranking and Q3's correlations must come out the same when recomputed from
 `weather_impact_summary` and `hourly_air_quality_demand`. It exits non-zero on failure.
 
+## Incremental updates (Week 3)
+
+An incremental release is a folder of files holding only new or re-delivered records, one file
+per dataset, under `data/updates/<release>/<dataset>/`. The municipality has published only the
+initial release, so release `v2` is generated from it:
+
+```bash
+python scripts/generate_updates.py            # writes data/updates/v2/ and reports/updates/v2.md
+python jobs/run_update.py v2                  # merges it into the silver tables
+python jobs/run_update.py v2 weather          #   or only some datasets
+python scripts/verify_incremental.py v2       # checks the result, writes reports/updates/v2_verification.md
+```
+
+| Dataset | Update file | New records | Duplicates | Schema change |
+|---|---|---:|---:|---|
+| taxi_trips | 1-7 April 2024, parquet | 668,834 trips | 10,185 copied trips | none |
+| weather | January 2025, CSV | 744 hours | 0 | `humidity` (double) added |
+| air_quality | January 2025, CSV | 3,968 readings, 744 hours | 0 | `aqi` (integer) added |
+
+`reports/updates/v2.md` describes how each file was generated and what the pipeline should do with
+it. The generator is seeded, so the files are identical on every run and are not committed.
+`--new-frac`, `--dup-frac` and `--dup-base` change the proportions. The assignment asks for 1-2%
+duplicate trips without saying of what, so by default they are 1.5% of the update file;
+`--dup-base original` takes 1.5% of the original trips instead.
+
+`run_update.py` runs each dataset through the same pipeline as the initial load (schema check,
+standardisation, transforms, quality rules) and then merges the result into the existing table:
+
+- A row whose key is not in the table is inserted. The key is the table's grain: `trip_id` for
+  taxi trips, `obs_hour` for weather and air quality.
+- A row whose key is already there is ignored and counted as a duplicate. Stored rows are never
+  rewritten, so applying the same release twice inserts nothing the second time.
+- Rows that fail a quality rule go to `_meta/quarantine`, as in the initial load.
+- A new source column is added to the table, and rows loaded before it read it as null. Only
+  additive changes are accepted: a column that changes type fails the run.
+- Only the partitions that received rows are re-optimised. The v2 taxi update rewrites the new
+  2024-04 partition and leaves January to March alone.
+
+Each run appends a row per dataset to `_meta/ingestion_metadata`, with `release`,
+`records_inserted` and `records_duplicate` alongside the existing counts. A new source column is
+listed in that row's `schema_drift`. The first update also turns on Delta's Change Data Feed for the
+silver tables, so later steps can read which rows an update inserted.
+
+Two steps are still manual:
+
+- The quality rules' time windows (`timestamp_window` in `conf/datasets/*.yaml`) have to be moved
+  to cover each release's period, or its records are rejected as out of range. They are set for
+  v2.
+- `air_quality` changes grain in `transforms/air_quality.py`, so a new column there needs an
+  aggregate written for it. `aqi` has one (the worst monitor per hour). A new weather column needs
+  nothing.
+
+`run_update.py` updates the silver tables only. The gold table and the data products are refreshed
+separately, so until they are, `verify_analytics.py` reports that the gold and silver versions of Q2
+disagree: silver has the April trips and gold does not yet.
+
+`run_ingest.py` rebuilds silver from `data/raw/` alone, so a full rebuild is `run_ingest.py`
+followed by `run_update.py` for each release in order.
+
 ## Project layout
 
 ```
@@ -157,7 +216,7 @@ conf/
   analytics.yaml              bucket edges, weather families and thresholds for the analytical queries
   products.yaml               the analytical data products: grain, schema version, partitioning
 src/urbanplatform/            the ingestion framework, the integration pipeline and the analytical layer
-  ingest.py                   one pipeline that runs every dataset
+  ingest.py                   one pipeline that runs every dataset, for the initial load and for updates
   integrate.py                builds gold/integrated_taxi_trips
   transforms/                 the only dataset-specific code
   analytics/                  the Week 2 analytical layer
@@ -172,7 +231,9 @@ jobs/                         one entry point per step (see Scripts)
 scripts/                      the environment check, raw-file profiling and correctness checks (see Scripts)
 docs/common_data_model.md     the common data model, with every column transformation listed
 reports/query_benchmark/      written by run_query_benchmark.py: measurements.md and plans/
+reports/updates/              written by generate_updates.py and verify_incremental.py
 data/raw/                     source files, not included (see Setup)
+data/updates/                 incremental releases, written by generate_updates.py, not included
 data/lakehouse/               created by the jobs
   silver/                     one Delta table per dataset
   gold/                       integrated_taxi_trips
@@ -236,3 +297,6 @@ prints a fix for the first thing that fails.
 | `jobs/run_products.py` | builds or refreshes the analytical data products and records their metadata | yes |
 | `scripts/verify_products.py` | checks the data products against their sources, and their metadata | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
+| `scripts/generate_updates.py` | generates an incremental release from the raw files, with its manifest | no |
+| `jobs/run_update.py` | merges an incremental release into the silver tables | yes |
+| `scripts/verify_incremental.py` | checks an applied release against the table before it and the manifest | yes |

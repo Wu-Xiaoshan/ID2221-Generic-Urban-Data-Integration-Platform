@@ -6,6 +6,9 @@ registry in ``transforms/``.
 
     read -> validate schema -> standardize -> pre-quality transform
          -> quality checks -> post-quality transform -> write Delta -> record metadata
+
+An incremental update runs the same function. ``DatasetConfig.for_release`` points the
+config at the release's files and sets the write mode to merge; nothing else differs.
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ def ingest_dataset(
     platform: PlatformConfig,
     cfg: DatasetConfig,
     run_id: str,
+    release: str | None = None,
 ) -> tuple[IngestionRun, DataFrame | None]:
     """Ingest one dataset. Returns its run record and any quarantined rows."""
     run = IngestionRun(
@@ -43,6 +47,7 @@ def ingest_dataset(
         source_filter=cfg.source.filter,
         write_mode=cfg.target.mode,
         partition_by=",".join(cfg.target.partition_by) or None,
+        release=release,
     )
     started = time.perf_counter()
     quarantined = None
@@ -67,8 +72,12 @@ def ingest_dataset(
             quarantined = to_quarantine(rejected, cfg, run_id)
 
         result = apply_post_quality(clean, cfg)
-        write_dataset(spark, result, cfg, target_path)
-        run.records_written = spark.read.format("delta").load(target_path).count()
+        merged = write_dataset(spark, result, cfg, target_path)
+        if merged is None:
+            run.records_written = spark.read.format("delta").load(target_path).count()
+        else:
+            run.records_written = run.records_inserted = merged.inserted
+            run.records_duplicate = merged.duplicates
 
         df.unpersist()
         run.status = "success"
@@ -87,10 +96,16 @@ def ingest_all(
     spark: SparkSession,
     platform: PlatformConfig,
     configs: list[DatasetConfig],
+    release: str | None = None,
 ) -> list[IngestionRun]:
-    """Ingest every configured dataset, then write the metadata for the whole run."""
+    """Ingest every configured dataset, then write the metadata for the whole run.
+
+    ``release`` names the incremental release being applied, if any. It is recorded on
+    every run row so updates can be told apart from full loads.
+    """
     run_id = uuid.uuid4().hex[:12]
-    print(f"run {run_id}: {len(configs)} dataset(s)\n")
+    label = f" (release {release})" if release else ""
+    print(f"run {run_id}{label}: {len(configs)} dataset(s)\n")
 
     runs: list[IngestionRun] = []
     quarantines: list[DataFrame] = []
@@ -99,13 +114,18 @@ def ingest_all(
         stages = registered(cfg.name) or ["none"]
         print(f"--- {cfg.name}  (source: {cfg.source.format}, "
               f"dataset-specific stages: {', '.join(stages)})")
-        run, quarantined = ingest_dataset(spark, platform, cfg, run_id)
+        run, quarantined = ingest_dataset(spark, platform, cfg, run_id, release)
         runs.append(run)
         if quarantined is not None:
             quarantines.append(quarantined)
 
         if run.status == "success":
-            print(f"    read {run.records_read:,}  ->  written {run.records_written:,}  "
+            if run.records_inserted is None:
+                outcome = f"written {run.records_written:,}"
+            else:
+                outcome = (f"inserted {run.records_inserted:,}, "
+                           f"duplicates ignored {run.records_duplicate:,}")
+            print(f"    read {run.records_read:,}  ->  {outcome}  "
                   f"(rejected {run.records_rejected:,})  in {run.duration_sec}s")
             if run.schema_drift:
                 print(f"    schema drift: {run.schema_drift}")

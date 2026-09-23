@@ -81,10 +81,11 @@ quality:
       columns: [obs_hour]
       name: duplicate_hour
 
+    # Extended by release v2, which covers January 2025.
     - type: timestamp_window
       column: obs_ts
       min: "2024-01-01"
-      max: "2025-01-01"
+      max: "2025-02-01"
       name: obs_outside_window
 
     # Physical plausibility. New York has never come close to either bound.
@@ -118,3 +119,10 @@ target:
   # 8,784 rows in well under a megabyte. Any partitioning here would produce
   # directories smaller than their own metadata.
   partition_by: []
+
+# Incremental releases (jobs/run_update.py). Release v2 adds a humidity column. It
+# needs no entry anywhere in this file: the snake_case rule already names it, and the
+# merge adds it to the table.
+incremental:
+  path: data/updates/{release}/weather/*.csv
+  merge_key: [obs_hour]
