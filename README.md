@@ -2,252 +2,8 @@
 
 A Spark + Delta Lake platform that ingests NYC taxi trips, weather, air quality and taxi zone data,
 standardises them into Delta tables that share one set of join keys, and integrates them into a
-single analytical table with one row per trip.
-
-## Running the platform
-
-```bash
-python jobs/run_ingest.py                      # 1. ingest all four datasets
-python jobs/run_ingest.py weather taxi_zones   #    or just these
-python jobs/run_integrate.py                   # 2. join them into gold/integrated_taxi_trips
-python jobs/run_benchmark.py                   # 3. compare the two storage strategies
-python jobs/run_queries.py                     # 4. run the analytical queries (Week 2)
-python jobs/run_query_benchmark.py             # 5. run the optimisation experiments (Week 2)
-python jobs/run_products.py                    # 6. build the analytical data products (Week 2)
-```
-
-Ingestion reads `data/raw/`, writes Delta tables to `data/lakehouse/silver/`, and appends one row
-per dataset to `_meta/ingestion_metadata`. Rejected rows go to `_meta/quarantine` with the rule that
-rejected them. A full run takes a few minutes and prints:
-
-```
-dataset              status           read     written  rejected     sec
-taxi_trips           success     9,554,778   9,551,907     2,871  183.47
-weather              success         8,784       8,784         0    6.75
-air_quality          success        51,885       8,784         0   36.97
-taxi_zones           success           265         265         0    5.62
-```
-
-Re-running is safe. The silver tables are overwritten and the surrogate keys are content hashes, so
-the same input always produces the same result.
-
-`run_integrate.py` joins the four silver tables into `gold/integrated_taxi_trips`, one row per trip
-with the weather and air quality at the pickup hour and the zone and borough of both endpoints. It
-takes three to four minutes, with some variation between runs, and appends a coverage row to
-`_meta/integration_metadata`. Its config is `conf/integration.yaml`.
-
-To read the integrated table:
-
-```python
-spark.read.format("delta").load("data/lakehouse/gold/integrated_taxi_trips")
-```
-
-The four silver tables under `data/lakehouse/silver/` load the same way.
-
-On Windows, Spark prints `ERROR ShutdownHookManager: Exception while deleting Spark temp dir` when
-it exits. The run has already finished at that point, so ignore it.
-
-## Analytical queries (Week 2)
-
-Twelve named queries cover the six analyses the Week 2 assignment asks for. They run as Spark SQL
-against `gold/integrated_taxi_trips` and, for the join experiments, against the silver tables behind
-it.
-
-```bash
-python jobs/run_queries.py --list                        # what is available
-python jobs/run_queries.py                               # run all twelve
-python jobs/run_queries.py q4_weather_sensitive_zones    # or just one
-python jobs/run_queries.py --explain q2_weather_distance_silver
-```
-
-The query design (grain, filters, normalisation, and the measurements behind each threshold) is in
-`DesignReportWeek2.pdf`. Bucket edges, the weather-code families and the support thresholds are
-configuration, in `conf/analytics.yaml`; the SQL hard-codes none of them.
-
-The timings `run_queries.py` prints come from a single cold run with no warm-up and no repeats. They
-show that the queries work; for measurements, use the benchmark harness below.
-
-To check that the results are correct:
-
-```bash
-python scripts/verify_analytics.py
-```
-
-Its invariants catch a filter that silently drops valid rows or a timezone conversion that never
-happened, and they confirm that the two implementations of Q2 still agree. It exits non-zero on
-failure.
-
-## Optimisation experiments (Week 2)
-
-```bash
-python jobs/run_query_benchmark.py                 # the seven experiments
-python jobs/run_query_benchmark.py --sweep         # plus AQE on/off across every query
-python jobs/run_query_benchmark.py --products      # plus each product against recomputing it
-python jobs/run_query_benchmark.py --only caching --repeats 5
-```
-
-`--products` needs `jobs/run_products.py` to have run. The numbers in the Week 2 benchmark report
-come from one run of `--sweep --products`, so that is the command to reproduce them.
-
-Each experiment is a pair of variants that differ in exactly one thing (a predicate that can prune, a
-join hint, a cached intermediate, a session setting) and that must return the same answer. The
-harness times both with interleaved repeats after a discarded warm-up, takes the median, verifies the
-two result sets agree, and captures both physical plans.
-
-Exit codes: 1 means the run crashed, 2 means an optimisation changed the answer.
-
-Output goes to `reports/query_benchmark/`: `measurements.md` with the timings and plan features, and
-`plans/<experiment>.<side>.txt` with the plans. Two plans are captured per variant, because
-`EXPLAIN FORMATTED` reports the plan *before* execution: under AQE that is `isFinalPlan=false` and
-shows none of AQE's rewrites, so the executed plan is captured afterwards as `.final.txt`.
-
-The analysis is in `BenchmarkReportWeek2.pdf`.
-
-## Analytical data products (Week 2)
-
-Four Delta tables materialise common reports from `gold/integrated_taxi_trips`, so analysts can read
-the results without running the queries.
-
-```bash
-python jobs/run_products.py --list                     # what is available
-python jobs/run_products.py                            # build or refresh all four
-python jobs/run_products.py weather_impact_summary     # or just one
-python jobs/run_products.py --if-stale                 # skip products already built from the current gold table
-python scripts/verify_products.py                      # check them
-```
-
-| Product | One row per | Partitioned by |
-|---|---|---|
-| `daily_mobility_summary` | New York local date and pickup borough | `pickup_year_month` |
-| `zone_monthly_statistics` | month and pickup zone | `pickup_year_month` |
-| `weather_impact_summary` | pickup zone and weather family | nothing |
-| `hourly_air_quality_demand` | UTC pickup hour | `pickup_year_month` |
-
-Products are written to `data/lakehouse/products/<name>`. Each one is a single Spark SQL statement in
-`src/urbanplatform/analytics/products.py` over the same views as the analytical queries, and
-`zone_monthly_statistics` embeds Q1 unchanged. Each product's grain, schema version and partitioning
-are set in `conf/products.yaml`.
-
-Metadata is recorded in two places. Every product table carries `product.*` Delta table properties:
-its source table and the Delta version of that table it was built from, creation and refresh time
-(UTC), schema version and a fingerprint of its columns. `_meta/data_product_metadata` gets one row
-per product per run with the same fields, plus row count, file count, size and duration. If a
-product's columns change and its `schema_version` does not, the run fails.
-
-```python
-spark.sql("DESCRIBE DETAIL delta.`data/lakehouse/products/daily_mobility_summary`").select("properties").show(truncate=False)
-spark.read.format("delta").load("data/lakehouse/_meta/data_product_metadata").show()
-```
-
-`verify_products.py` checks each product's key, metadata and freshness, and compares it with its
-source. The daily trips must add up to the gold table, and `zone_monthly_statistics` must equal Q1.
-Q4's ranking and Q3's correlations must come out the same when recomputed from
-`weather_impact_summary` and `hourly_air_quality_demand`. It exits non-zero on failure.
-
-## Incremental updates (Week 3)
-
-An incremental release is a folder of files holding only new or re-delivered records, one file
-per dataset, under `data/updates/<release>/<dataset>/`. The municipality has published only the
-initial release, so release `v2` is generated from it:
-
-```bash
-python scripts/generate_updates.py            # writes data/updates/v2/ and reports/updates/v2.md
-python jobs/run_update.py v2                  # merges it into the silver tables
-python jobs/run_update.py v2 weather          #   or only some datasets
-python scripts/verify_incremental.py v2       # checks the result, writes reports/updates/v2_verification.md
-```
-
-| Dataset | Update file | New records | Duplicates | Schema change |
-|---|---|---:|---:|---|
-| taxi_trips | 1-7 April 2024, parquet | 668,834 trips | 10,185 copied trips | none |
-| weather | January 2025, CSV | 744 hours | 0 | `humidity` (double) added |
-| air_quality | January 2025, CSV | 3,968 readings, 744 hours | 0 | `aqi` (integer) added |
-
-`reports/updates/v2.md` describes how each file was generated and what the pipeline should do with
-it. The generator is seeded, so the files are identical on every run and are not committed.
-`--new-frac`, `--dup-frac` and `--dup-base` change the proportions. The assignment asks for 1-2%
-duplicate trips without saying of what, so by default they are 1.5% of the update file;
-`--dup-base original` takes 1.5% of the original trips instead.
-
-`run_update.py` runs each dataset through the same pipeline as the initial load (schema check,
-standardisation, transforms, quality rules) and then merges the result into the existing table:
-
-- A row whose key is not in the table is inserted. The key is the table's grain: `trip_id` for
-  taxi trips, `obs_hour` for weather and air quality.
-- A row whose key is already there is ignored and counted as a duplicate. Stored rows are never
-  rewritten, so applying the same release twice inserts nothing the second time.
-- Rows that fail a quality rule go to `_meta/quarantine`, as in the initial load.
-- A new source column is added to the table, and rows loaded before it read it as null. Only
-  additive changes are accepted: a column that changes type fails the run.
-- Only the partitions that received rows are re-optimised. The v2 taxi update rewrites the new
-  2024-04 partition and leaves January to March alone.
-
-Each run appends a row per dataset to `_meta/ingestion_metadata`, with `release`,
-`records_inserted` and `records_duplicate` alongside the existing counts. A new source column is
-listed in that row's `schema_drift`. The first update also turns on Delta's Change Data Feed for the
-silver tables, so later steps can read which rows an update inserted.
-
-Two steps are still manual:
-
-- The quality rules' time windows (`timestamp_window` in `conf/datasets/*.yaml`) have to be moved
-  to cover each release's period, or its records are rejected as out of range. They are set for
-  v2.
-- `air_quality` changes grain in `transforms/air_quality.py`, so a new column there needs an
-  aggregate written for it. `aqi` has one (the worst monitor per hour). A new weather column needs
-  nothing.
-
-`run_update.py` updates the silver tables only. The gold table and the data products are refreshed
-separately, so until they are, `verify_analytics.py` reports that the gold and silver versions of Q2
-disagree: silver has the April trips and gold does not yet.
-
-`run_ingest.py` rebuilds silver from `data/raw/` alone, so a full rebuild is `run_ingest.py`
-followed by `run_update.py` for each release in order.
-
-## Project layout
-
-```
-DesignReportWeek2.pdf         the design report
-BenchmarkReportWeek2.pdf      the benchmark report
-README.md                     this file
-conf/
-  platform.yaml               Spark settings and the lakehouse root
-  datasets/*.yaml             one file per dataset: source, schema, renames, timestamps, quality rules
-  integration.yaml            how the integration joins the four tables
-  analytics.yaml              bucket edges, weather families and thresholds for the analytical queries
-  products.yaml               the analytical data products: grain, schema version, partitioning
-src/urbanplatform/            the ingestion framework, the integration pipeline and the analytical layer
-  ingest.py                   one pipeline that runs every dataset, for the initial load and for updates
-  integrate.py                builds gold/integrated_taxi_trips
-  transforms/                 the only dataset-specific code
-  analytics/                  the Week 2 analytical layer
-    config.py                 loads conf/analytics.yaml and turns it into SQL CASE expressions
-    views.py                  the views that queries and products read: trips, hourly_demand
-    queries.py                the analytical query library
-    benchmark.py              the benchmark harness: timing, result comparison, plan capture
-    experiments.py            the optimisation experiments
-    products.py               what each data product computes
-    materialize.py            writes the data products and their metadata
-jobs/                         one entry point per step (see Scripts)
-scripts/                      the environment check, raw-file profiling and correctness checks (see Scripts)
-docs/common_data_model.md     the common data model, with every column transformation listed
-reports/query_benchmark/      written by run_query_benchmark.py: measurements.md and plans/
-reports/updates/              written by generate_updates.py and verify_incremental.py
-data/raw/                     source files, not included (see Setup)
-data/updates/                 incremental releases, written by generate_updates.py, not included
-data/lakehouse/               created by the jobs
-  silver/                     one Delta table per dataset
-  gold/                       integrated_taxi_trips
-  benchmark/                  the two storage variants the benchmark compares
-  products/                   the analytical data products
-  _meta/                      ingestion_metadata, integration_metadata, data_product_metadata, quarantine
-```
-
-## Adding a dataset
-
-Write `conf/datasets/<name>.yaml` declaring the source, expected schema, renames, timestamps, casts
-and quality rules. Most datasets need no Python. If one needs a derived column that cannot be
-declared, add a function to `src/urbanplatform/transforms/` and register it with `@pre_quality` or
-`@post_quality`.
+single analytical table with one row per trip. New releases of the data are merged into the
+existing tables without rebuilding them.
 
 ## Setup
 
@@ -283,20 +39,220 @@ python scripts/check_env.py
 It verifies Java, the Hadoop helpers, the Python packages, the raw files and a real Delta write, and
 prints a fix for the first thing that fails.
 
+On Windows, Spark prints `ERROR ShutdownHookManager: Exception while deleting Spark temp dir` when
+it exits. The run has already finished at that point, so ignore it.
+
+## Initial load
+
+```bash
+python jobs/run_ingest.py                      # the four datasets into data/lakehouse/silver/
+python jobs/run_ingest.py weather taxi_zones   #   or just these
+python jobs/run_integrate.py                   # the silver tables joined into gold/integrated_taxi_trips
+python jobs/run_products.py                    # the four analytical data products
+```
+
+Ingestion reads `data/raw/` and takes a few minutes. Re-running it is safe: the silver tables are
+overwritten and the surrogate keys are content hashes, so the same input gives the same result.
+`run_integrate.py` produces one row per trip with the weather and air quality at the pickup hour and
+the zone and borough of both endpoints. Its config is `conf/integration.yaml`.
+
+Every table loads the same way:
+
+```python
+spark.read.format("delta").load("data/lakehouse/gold/integrated_taxi_trips")
+```
+
+## Processing incremental updates
+
+An incremental release is a folder of files holding only new or re-delivered records, one file per
+dataset, under `data/updates/<release>/<dataset>/`. The municipality has published only the initial
+release, so release `v2` is generated from it:
+
+```bash
+python scripts/generate_updates.py            # writes data/updates/v2/ and reports/updates/v2.md
+python jobs/run_update.py v2                  # merges it into the silver tables
+python jobs/run_update.py v2 weather          #   or only some datasets
+python scripts/verify_incremental.py v2       # checks the result, writes reports/updates/v2_verification.md
+```
+
+| Dataset | Update file | New records | Duplicates | Schema change |
+|---|---|---:|---:|---|
+| taxi_trips | 1-7 April 2024, parquet | 668,834 trips | 10,185 copied trips | none |
+| weather | January 2025, CSV | 744 hours | 0 | `humidity` (double) added |
+| air_quality | January 2025, CSV | 3,968 readings, 744 hours | 0 | `aqi` (integer) added |
+
+`reports/updates/v2.md` describes how each file was generated and what the pipeline should do with
+it. The generator is seeded, so the files are identical on every run and are not committed.
+`--new-frac`, `--dup-frac` and `--dup-base` change the proportions. The assignment asks for 1-2%
+duplicate trips without saying of what, so by default they are 1.5% of the update file;
+`--dup-base original` takes 1.5% of the original trips instead.
+
+`run_update.py` runs each dataset through the same pipeline as the initial load (schema check,
+standardisation, transforms, quality rules) and then merges the result into the existing table:
+
+- A row whose key is not in the table is inserted. The key is the table's grain: `trip_id` for
+  taxi trips, `obs_hour` for weather and air quality.
+- A row whose key is already there is ignored and counted as a duplicate. Stored rows are never
+  rewritten, so applying the same release twice inserts nothing the second time.
+- Rows that fail a quality rule go to `_meta/quarantine`, as in the initial load.
+- Only the partitions that received rows are re-optimised. The v2 taxi update rewrites the new
+  2024-04 partition and leaves January to March alone.
+
+The first update also turns on Delta's Change Data Feed for the silver tables, so later steps can
+read which rows an update inserted.
+
+`run_update.py` updates the silver tables only. The gold table and the data products are refreshed
+separately, so until they are, `verify_analytics.py` reports that the gold and silver versions of Q2
+disagree: silver has the April trips and gold does not yet.
+
+`run_ingest.py` rebuilds silver from `data/raw/` alone, so a full rebuild is `run_ingest.py`
+followed by `run_update.py` for each release in order.
+
+## Handling schema evolution
+
+Every run compares the source's columns with `expected_columns` in `conf/datasets/<name>.yaml`. A
+missing column listed under `required_columns` stops the job. Any other missing column, a new
+column or a changed type is recorded in the run's `schema_drift`, and `schema_version` holds a
+fingerprint of the source's column names and types.
+
+During an update, only additive changes are applied. Delta's schema auto-merge is switched on for
+the merge statement alone, so a new source column is added to the table and rows loaded before it
+read it as null. A column that changes type fails the run.
+
+A new column needs no configuration when its dataset keeps every column, as weather does: the
+snake_case naming rule names it and the merge adds it. Two cases need a manual change:
+
+- A column in a file read without schema inference arrives as a string and needs a `cast` entry.
+  `aqi` has one in `conf/datasets/air_quality.yaml`.
+- `air_quality` changes grain in `transforms/air_quality.py`, aggregating six monitors into one
+  row per hour, so a new column there needs an aggregate written for it. `aqi` takes the worst
+  monitor per hour.
+
+The quality rules' time windows (`timestamp_window` in `conf/datasets/*.yaml`) also have to be moved
+to cover each release's period, or its records are rejected as out of range. They are set for v2.
+
+To see what changed in each run:
+
+```python
+(spark.read.format("delta").load("data/lakehouse/_meta/ingestion_metadata")
+    .select("started_at", "dataset_name", "release", "schema_version", "schema_drift")
+    .orderBy("started_at").show(truncate=False))
+```
+
+## Monitoring
+
+Every job appends a record of each run to a Delta table under `data/lakehouse/_meta/`:
+
+| Table | One row per | What it records |
+|---|---|---|
+| `ingestion_metadata` | dataset per ingestion or update run | status, duration, source files, records read, written, rejected, inserted and ignored as duplicates, schema version and drift, error |
+| `integration_metadata` | integration run | status, duration, trips in and out, how many trips got exact, filled or missing weather and air quality |
+| `data_product_metadata` | product per refresh | status, duration, source table and version, schema version, rows, files, size |
+
+```python
+spark.read.format("delta").load("data/lakehouse/_meta/ingestion_metadata").show()
+```
+
+## Validation reports
+
+Each dataset's quality rules are declared in its `conf/datasets/<name>.yaml` (`not_null`, `unique`,
+`range`, `timestamp_window`, `allowed_values`, `expression`). A rule either rejects a row or flags
+it. A rejected row goes to `_meta/quarantine` with the names of the rules it failed and the whole
+row as JSON. A flagged row stays in the table with a `dq_<rule>` column set to true.
+
+Rejections per dataset and rule:
+
+```python
+(spark.read.format("delta").load("data/lakehouse/_meta/quarantine")
+    .groupBy("dataset_name", "failed_rules").count().show(truncate=False))
+```
+
+Three scripts check the results end to end and exit non-zero on failure:
+
+```bash
+python scripts/verify_incremental.py v2   # an applied release; writes reports/updates/v2_verification.md
+python scripts/verify_analytics.py        # the analytical queries' invariants
+python scripts/verify_products.py         # the data products against their sources
+```
+
+## Analytical layer
+
+Twelve Spark SQL queries and four materialised data products read `gold/integrated_taxi_trips`.
+Their design is in `DesignReportWeek2.pdf`, and the optimisation experiments behind them in
+`BenchmarkReportWeek2.pdf`.
+
+```bash
+python jobs/run_queries.py --list        # the queries
+python jobs/run_queries.py               # run all twelve
+python jobs/run_products.py              # build or refresh all four products
+python jobs/run_products.py --if-stale   # skip products already built from the current gold table
+```
+
+| Product | One row per | Partitioned by |
+|---|---|---|
+| `daily_mobility_summary` | New York local date and pickup borough | `pickup_year_month` |
+| `zone_monthly_statistics` | month and pickup zone | `pickup_year_month` |
+| `weather_impact_summary` | pickup zone and weather family | nothing |
+| `hourly_air_quality_demand` | UTC pickup hour | `pickup_year_month` |
+
+Bucket edges, weather families and thresholds are in `conf/analytics.yaml`, and each product's
+grain, schema version and partitioning in `conf/products.yaml`.
+
+## Adding a dataset
+
+Write `conf/datasets/<name>.yaml` declaring the source, expected schema, renames, timestamps, casts
+and quality rules. Most datasets need no Python. If one needs a derived column that cannot be
+declared, add a function to `src/urbanplatform/transforms/` and register it with `@pre_quality` or
+`@post_quality`. To take incremental releases, add an `incremental` section with the path pattern
+of its update files and the merge key.
+
+## Project layout
+
+```
+DesignReportWeek2.pdf         the Week 2 design report
+BenchmarkReportWeek2.pdf      the Week 2 benchmark report
+README.md                     this file
+conf/
+  platform.yaml               Spark settings and the lakehouse root
+  datasets/*.yaml             one file per dataset: source, schema, renames, timestamps, quality rules, updates
+  integration.yaml            how the integration joins the four tables
+  analytics.yaml              bucket edges, weather families and thresholds for the analytical queries
+  products.yaml               the analytical data products: grain, schema version, partitioning
+src/urbanplatform/            the ingestion framework, the integration pipeline and the analytical layer
+  ingest.py                   one pipeline that runs every dataset, for the initial load and for updates
+  writer.py                   Delta writes: overwrite for a full load, merge for an update
+  integrate.py                builds gold/integrated_taxi_trips
+  transforms/                 the only dataset-specific code
+  analytics/                  the analytical queries, the data products and the benchmark harness
+jobs/                         one entry point per step (see Scripts)
+scripts/                      the environment check, the update generator and the correctness checks
+docs/common_data_model.md     the common data model, with every column transformation listed
+reports/query_benchmark/      written by run_query_benchmark.py
+reports/updates/              written by generate_updates.py and verify_incremental.py
+data/raw/                     source files, not included (see Setup)
+data/updates/                 incremental releases, written by generate_updates.py, not included
+data/lakehouse/               created by the jobs
+  silver/                     one Delta table per dataset
+  gold/                       integrated_taxi_trips
+  benchmark/                  the two storage variants the Week 1 benchmark compares
+  products/                   the analytical data products
+  _meta/                      ingestion_metadata, integration_metadata, data_product_metadata, quarantine
+```
+
 ## Scripts
 
 | Script | What it does | Needs Spark |
 |---|---|---|
-| `jobs/run_ingest.py` | runs the ingestion framework | yes |
-| `jobs/run_integrate.py` | joins the silver tables into `gold/integrated_taxi_trips` | yes |
 | `scripts/check_env.py` | verifies the whole stack end to end | yes |
-| `jobs/run_benchmark.py` | rewrites the fact table two ways and measures both | yes |
-| `jobs/run_queries.py` | runs the Week 2 analytical query library | yes |
-| `jobs/run_query_benchmark.py` | runs the optimisation experiments, writes the measurements | yes |
-| `scripts/verify_analytics.py` | checks the analytical layer's correctness invariants | yes |
+| `jobs/run_ingest.py` | loads the raw files into the silver tables | yes |
+| `jobs/run_integrate.py` | joins the silver tables into `gold/integrated_taxi_trips` | yes |
 | `jobs/run_products.py` | builds or refreshes the analytical data products and records their metadata | yes |
-| `scripts/verify_products.py` | checks the data products against their sources, and their metadata | yes |
-| `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
+| `jobs/run_queries.py` | runs the analytical query library | yes |
 | `scripts/generate_updates.py` | generates an incremental release from the raw files, with its manifest | no |
 | `jobs/run_update.py` | merges an incremental release into the silver tables | yes |
 | `scripts/verify_incremental.py` | checks an applied release against the table before it and the manifest | yes |
+| `scripts/verify_analytics.py` | checks the analytical queries' correctness invariants | yes |
+| `scripts/verify_products.py` | checks the data products against their sources, and their metadata | yes |
+| `jobs/run_benchmark.py` | Week 1: rewrites the fact table two ways and measures both | yes |
+| `jobs/run_query_benchmark.py` | Week 2: runs the query optimisation experiments | yes |
+| `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
