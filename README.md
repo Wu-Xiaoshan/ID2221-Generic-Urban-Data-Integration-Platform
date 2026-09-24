@@ -168,31 +168,170 @@ To see what changed in each run:
 
 ## Monitoring
 
-Every job appends a record of each run to a Delta table under `data/lakehouse/_meta/`:
+Every job appends a record of what it did to a Delta table under `data/lakehouse/_meta/`. Five
+tables sit at three different grains, so a question can be answered at the level it belongs to
+rather than by reading logs.
 
 | Table | One row per | What it records |
 |---|---|---|
-| `ingestion_metadata` | dataset per ingestion or update run | status, duration, source files, records read, written, rejected, inserted and ignored as duplicates, schema version and drift, error |
+| `ingestion_metadata` | dataset per ingestion or update run | status, duration, source files, records read, written, rejected, inserted and ignored as duplicates, schema version, drift and policy violations, error |
+| `validation_metrics` | quality rule per dataset per run | rule name, type and whether it rejects or flags; whether it ran; how many records it caught; the rows it was measured against |
+| `quarantine` | rejected record | the dataset, the rules the record failed, and the whole record as JSON |
 | `integration_metadata` | integration or refresh run | status, duration, mode (full, incremental or skipped) and the reason for a full rebuild, rows inserted, updated and deleted, the silver versions read, trips in and out, how many trips got exact, filled or missing weather and air quality |
 | `data_product_metadata` | product per refresh | status, duration, mode (full, incremental or skipped), the months rewritten, source table and version, schema version, rows, files, size |
 
-```python
-spark.read.format("delta").load("data/lakehouse/_meta/ingestion_metadata").show()
+Three of those tables record runs, but each counts something different: ingestion counts records,
+integration counts trips, a data product counts rows. `jobs/run_monitoring.py` registers a view
+called `pipeline_runs` that maps all three onto one set of columns, so "which step is slowest" is
+one query instead of three.
+
+### Reading the report
+
+```bash
+python jobs/run_monitoring.py                          # every question in conf/monitoring.yaml
+python jobs/run_monitoring.py slowest_datasets         #   or only these
+python jobs/run_monitoring.py --list                   # the questions and the tables they read
+python jobs/run_monitoring.py --sql "SELECT * FROM pipeline_runs ORDER BY started_at DESC LIMIT 10"
 ```
+
+The job only reads. It writes nothing to the lakehouse, and each run leaves a copy of its output in
+`reports/monitoring/<timestamp>.md`. A question whose table has not been written yet is reported as
+skipped rather than failing the report, which is what happens on a fresh platform where no product
+has been built.
+
+Ten questions ship with the platform:
+
+| Question | Answers |
+|---|---|
+| `validation_failures_by_dataset` | which dataset fails validation most often |
+| `failing_rules` | which individual rules catch the most records |
+| `unapplied_rules` | which rules did not run, or ran without being counted |
+| `slowest_datasets` | which dataset takes longest, averaged over its runs |
+| `rejected_per_execution` | how many records each execution rejected |
+| `processing_time_trend` | how each step's duration has moved, run by run |
+| `quarantine_by_rule` | what is sitting in quarantine and which rule put it there |
+| `schema_history` | where a source schema moved, and whether the change was accepted |
+| `failed_runs` | what has failed, most recent first |
+| `analytical_refresh_cost` | what keeping each data product current costs per refresh |
+
+### Adding a question
+
+Append an entry to `conf/monitoring.yaml`. No code changes.
+
+```yaml
+  - name: rejections_last_week
+    question: What has been rejected in the last seven days?
+    requires: [ingestion_metadata]
+    sql: |
+      SELECT dataset_name, SUM(records_rejected) AS rejected
+      FROM ingestion_metadata
+      WHERE started_at > current_timestamp() - INTERVAL 7 DAYS
+      GROUP BY dataset_name
+```
+
+`requires` names the views the query reads. Listing them is what lets the report skip a question
+cleanly instead of raising when a table is missing.
+
+### Switching it off
+
+`monitoring.enabled: false` in `conf/platform.yaml` stops every metadata write. The pipelines still
+run and still validate; they just leave no record. This exists to measure what monitoring costs, and
+it is not a normal operating mode.
 
 ## Validation reports
 
-Each dataset's quality rules are declared in its `conf/datasets/<name>.yaml` (`not_null`, `unique`,
-`range`, `timestamp_window`, `allowed_values`, `expression`). A rule either rejects a row or flags
-it. A rejected row goes to `_meta/quarantine` with the names of the rules it failed and the whole
-row as JSON. A flagged row stays in the table with a `dq_<rule>` column set to true.
+Each dataset's quality rules are declared in its `conf/datasets/<name>.yaml`. Eight rule types ship
+with the platform, none of which knows anything about a particular dataset:
 
-Rejections per dataset and rule:
+| Type | Catches | Example |
+|---|---|---|
+| `not_null` | missing values in columns that must have one | `columns: [trip_id, pickup_ts]` |
+| `range` | a number outside plausible bounds | `column: temp_c, min: -40, max: 55` |
+| `timestamp_window` | a record dated outside the release's coverage | `column: pickup_ts, min: "2024-01-01 05:00:00"` |
+| `allowed_values` | a code outside the set the platform understands | `column: vendor_id, values: [1, 2, 6, 7]` |
+| `expression` | anything the others cannot express, as Spark SQL | `expression: "dropoff_ts > pickup_ts"` |
+| `completeness` | an incomplete record: too few of a group of columns carry a value | `columns: [...], min_present: 5` |
+| `unique` | a duplicate, at the grain the key describes | `columns: [trip_id]` |
+| `foreign_key` | a missing reference record | `column: pu_location_id, references: {table: taxi_zones, column: location_id}` |
+
+A rule either rejects a record or flags it. A rejected record goes to `_meta/quarantine` with the
+names of the rules it failed and the whole record as JSON, and it never reaches gold or the data
+products. A flagged record stays in the table with a `dq_<rule>` column set to true, which suits an
+anomaly that is suspicious without being wrong. Zero-distance trips are flagged, not dropped: there
+are 213,300 of them in the original files, and they are real records of real transactions.
+
+A failing dataset does not stop the run. Each dataset is ingested inside its own error boundary, so
+the three others in the same run finish normally and the failure is recorded against the one that
+caused it.
+
+### What each rule did
+
+`_meta/validation_metrics` holds one row per rule per run, whether or not the rule caught anything:
 
 ```python
-(spark.read.format("delta").load("data/lakehouse/_meta/quarantine")
-    .groupBy("dataset_name", "failed_rules").count().show(truncate=False))
+(spark.read.format("delta").load("data/lakehouse/_meta/validation_metrics")
+    .select("dataset_name", "rule_name", "rule_type", "status", "failed_records")
+    .orderBy("recorded_at", "dataset_name", "rule_name").show(50, truncate=False))
 ```
+
+`status` says how much the number can be trusted:
+
+| `status` | Meaning |
+|---|---|
+| `applied` | the rule ran, and `failed_records` is its count |
+| `skipped` | the rule could not run, and `note` says why |
+| `uncounted` | the rule ran, but its result could not be measured |
+
+The distinction matters more than it looks. A `foreign_key` rule whose reference table has not been
+built yet is skipped, and reporting that as zero failures would claim the data is clean when nothing
+checked it. `unapplied_rules` in the monitoring report lists everything that is not `applied`.
+
+### Schema changes
+
+Rule types check records. A change to the source's layout is a property of the whole file, so it is
+handled separately, by the `schema_policy` block in each dataset's config:
+
+```yaml
+schema_policy:
+  on_new_column: allow      # allow, flag or fail
+  on_missing_column: fail
+  on_type_change: flag
+```
+
+`allow` records the change and carries on, `flag` records it as a violation and carries on, `fail`
+stops that dataset. The three time-series feeds allow new columns, because that is how they evolve:
+v2 adds `humidity` to weather and `aqi` to air quality, and both arrive without anyone editing a
+config. `taxi_zones` fails on any new column instead. It is the conformed dimension every join
+depends on, it has no incremental releases, and a column appearing in it means something upstream
+changed that nobody planned for.
+
+Violations are written to `schema_violations` in `ingestion_metadata` whether or not they stopped
+the run, so `flag` is visible without reading the logs.
+
+### Adding a rule type
+
+Write a function and register it. The engine in `src/urbanplatform/quality.py` is never touched.
+
+```python
+from .rules import predicate
+
+@predicate("regex")
+def _regex(rule, df):
+    column = F.col(rule.params["column"])
+    return column.isNull() | column.rlike(rule.params["pattern"])
+```
+
+A predicate returns a column that is true when the record satisfies the rule. Checks that cannot be
+expressed one record at a time use `@frame_rule` instead and receive the whole frame plus a context
+that can read other tables. `unique` and `foreign_key` are the two built-in examples.
+
+### Switching it off
+
+`validation.enabled: false` in `conf/platform.yaml` skips validation entirely. `validation.metrics:
+false` keeps the rules but stops the per-rule counts, which are the only part that costs extra
+passes over the data. Both are there for the evaluation experiments.
+
+### End-to-end checks
 
 Four scripts check the results end to end and exit non-zero on failure:
 
@@ -250,9 +389,15 @@ conf/
   integration.yaml            how the integration joins the four tables
   analytics.yaml              bucket edges, weather families and thresholds for the analytical queries
   products.yaml               the analytical data products: grain, schema version, partitioning
+  monitoring.yaml             the operational questions the platform answers about itself
 src/urbanplatform/            the ingestion framework, the integration pipeline and the analytical layer
   ingest.py                   one pipeline that runs every dataset, for the initial load and for updates
   writer.py                   Delta writes: overwrite for a full load, merge for an update
+  quality.py                  the validation engine: applies the rules, splits and reports
+  rules.py                    the rule type registry and the context a rule may reach beyond its frame
+  rules_builtin.py            the eight rule types that ship with the platform
+  metadata.py                 the run, validation and quarantine tables
+  monitoring.py               views over the _meta tables, and the query runner behind run_monitoring.py
   integrate.py                builds gold/integrated_taxi_trips and refreshes it from the silver change feeds
   transforms/                 the only dataset-specific code
   analytics/                  the analytical queries, the data products and the benchmark harness
@@ -261,6 +406,7 @@ scripts/                      the environment check, the update generator and th
 docs/common_data_model.md     the common data model, with every column transformation listed
 reports/query_benchmark/      written by run_query_benchmark.py
 reports/updates/              written by generate_updates.py and verify_incremental.py
+reports/monitoring/           written by run_monitoring.py, one file per run
 data/raw/                     source files, not included (see Setup)
 data/updates/                 incremental releases, written by generate_updates.py, not included
 data/lakehouse/               created by the jobs
@@ -268,7 +414,7 @@ data/lakehouse/               created by the jobs
   gold/                       integrated_taxi_trips
   benchmark/                  the two storage variants the Week 1 benchmark compares
   products/                   the analytical data products
-  _meta/                      ingestion_metadata, integration_metadata, data_product_metadata, quarantine
+  _meta/                      ingestion_metadata, validation_metrics, quarantine, integration_metadata, data_product_metadata
 ```
 
 ## Scripts
@@ -283,6 +429,7 @@ data/lakehouse/               created by the jobs
 | `scripts/generate_updates.py` | generates an incremental release from the raw files, with its manifest | no |
 | `jobs/run_update.py` | merges an incremental release into the silver tables | yes |
 | `jobs/run_refresh.py` | brings gold and the data products up to date after an update | yes |
+| `jobs/run_monitoring.py` | answers the operational questions in `conf/monitoring.yaml` and writes a report | yes |
 | `scripts/verify_refresh.py` | checks gold and the products against a rebuild from scratch | yes |
 | `scripts/verify_incremental.py` | checks an applied release against the table before it and the manifest | yes |
 | `scripts/verify_analytics.py` | checks the analytical queries' correctness invariants | yes |

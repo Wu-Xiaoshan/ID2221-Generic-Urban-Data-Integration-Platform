@@ -7,7 +7,7 @@ Written by `scripts/verify_incremental.py v2` after `jobs/run_update.py v2`.
 
 | Dataset | Rows before | Inserted | Duplicates ignored | Rejected | Rows after | New columns | Runs of the release |
 |---|---:|---:|---:|---:|---:|---|---:|
-| taxi_trips | 9,551,907 | 668,620 | 10,185 | 214 | 10,220,527 | none | 2 |
+| taxi_trips | 9,551,909 | 668,620 | 10,185 | 214 | 10,220,529 | none | 2 |
 | weather | 8,784 | 744 | 0 | 0 | 9,528 | humidity | 2 |
 | air_quality | 8,784 | 744 | 0 | 0 | 9,528 | aqi | 2 |
 
@@ -16,9 +16,9 @@ Written by `scripts/verify_incremental.py v2` after `jobs/run_update.py v2`.
 | Dataset | Check | Result | Detail |
 |---|---|---|---|
 | taxi_trips | applied | pass | 1 merge commit(s) in the table history |
-| taxi_trips | counts | pass | 9,551,907 before + 668,620 inserted = 10,220,527, table has 10,220,527 |
+| taxi_trips | counts | pass | 9,551,909 before + 668,620 inserted = 10,220,529, table has 10,220,529 |
 | taxi_trips | unique key | pass | 0 key value(s) appear more than once |
-| taxi_trips | preserved | pass | 0 of 9,551,907 existing rows missing or changed |
+| taxi_trips | preserved | pass | 0 of 9,551,909 existing rows missing or changed |
 | taxi_trips | new columns | pass | table gained none, manifest declares none |
 | taxi_trips | expected inserted | pass | first merge inserted 668,620, manifest expects 668,620 |
 | taxi_trips | expected duplicates | pass | first merge ignored 10,185, manifest expects 10,185 |
