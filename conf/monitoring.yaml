@@ -1,0 +1,148 @@
+queries:
+  - name: validation_failures_by_dataset
+    question: Which dataset fails validation most frequently?
+    requires: [validation_metrics]
+    sql: |
+      -- A row that breaks three rules is three rule hits but one record, so the two
+      -- are counted separately: frequency is about runs, volume is about hits.
+      WITH per_run AS (
+        SELECT dataset_name, run_id,
+               MAX(records_read)   AS records_read,
+               SUM(failed_records) AS rule_hits,
+               SUM(CASE WHEN failed_records > 0 THEN 1 ELSE 0 END) AS rules_failed
+        FROM validation_metrics
+        WHERE status = 'applied'
+        GROUP BY dataset_name, run_id
+      )
+      SELECT dataset_name,
+             COUNT(*)                                                AS runs,
+             SUM(CASE WHEN rules_failed > 0 THEN 1 ELSE 0 END)       AS runs_with_failures,
+             ROUND(100.0 * SUM(CASE WHEN rules_failed > 0 THEN 1 ELSE 0 END)
+                   / COUNT(*), 1)                                    AS pct_runs_failing,
+             SUM(rule_hits)                                          AS rule_hits,
+             ROUND(100.0 * SUM(rule_hits) / NULLIF(SUM(records_read), 0), 4) AS hits_per_100_reads
+      FROM per_run
+      GROUP BY dataset_name
+      ORDER BY pct_runs_failing DESC, rule_hits DESC
+
+  - name: failing_rules
+    question: Which individual rules catch the most records?
+    requires: [validation_metrics]
+    sql: |
+      SELECT dataset_name, rule_name, rule_type, on_fail,
+             COUNT(*)                  AS executions,
+             SUM(failed_records)       AS records_caught,
+             MAX(failed_records)       AS worst_execution
+      FROM validation_metrics
+      WHERE status = 'applied'
+      GROUP BY dataset_name, rule_name, rule_type, on_fail
+      HAVING SUM(failed_records) > 0
+      ORDER BY records_caught DESC
+
+  - name: unapplied_rules
+    question: Which rules did not run, or ran without their failures being counted?
+    requires: [validation_metrics]
+    sql: |
+      -- Anything here is a hole in the validation record: a rule that reported no
+      -- number, rather than a rule that reported zero.
+      SELECT dataset_name, rule_name, rule_type, status, note,
+             COUNT(*)         AS executions,
+             MAX(recorded_at) AS last_seen
+      FROM validation_metrics
+      WHERE status <> 'applied'
+      GROUP BY dataset_name, rule_name, rule_type, status, note
+      ORDER BY executions DESC
+
+  - name: slowest_datasets
+    question: Which dataset requires the longest processing time?
+    requires: [pipeline_runs]
+    sql: |
+      SELECT entity, pipeline,
+             COUNT(*)                       AS executions,
+             ROUND(AVG(duration_sec), 2)    AS avg_sec,
+             ROUND(MAX(duration_sec), 2)    AS max_sec,
+             ROUND(SUM(duration_sec), 2)    AS total_sec,
+             SUM(records_read)              AS records_read
+      FROM pipeline_runs
+      WHERE status = 'success'
+      GROUP BY entity, pipeline
+      ORDER BY avg_sec DESC
+
+  - name: rejected_per_execution
+    question: How many records were rejected during each execution?
+    requires: [ingestion_metadata]
+    sql: |
+      SELECT run_id,
+             COALESCE(release, 'initial load')  AS release,
+             MIN(started_at)                    AS started_at,
+             COUNT(*)                           AS datasets,
+             SUM(records_read)                  AS records_read,
+             SUM(records_written)               AS records_written,
+             SUM(records_rejected)              AS records_rejected,
+             ROUND(100.0 * SUM(records_rejected) / NULLIF(SUM(records_read), 0), 4) AS pct_rejected
+      FROM ingestion_metadata
+      GROUP BY run_id, COALESCE(release, 'initial load')
+      ORDER BY started_at DESC
+
+  - name: processing_time_trend
+    question: How has processing time changed over multiple executions?
+    requires: [pipeline_runs]
+    sql: |
+      SELECT entity, pipeline, started_at,
+             ROUND(duration_sec, 2) AS duration_sec,
+             ROUND(duration_sec - LAG(duration_sec) OVER (
+                   PARTITION BY entity ORDER BY started_at), 2) AS delta_vs_previous,
+             records_read,
+             ROUND(records_read / NULLIF(duration_sec, 0), 0) AS records_per_sec
+      FROM pipeline_runs
+      WHERE status = 'success' AND duration_sec IS NOT NULL
+      ORDER BY entity, started_at
+
+  - name: quarantine_by_rule
+    question: What is actually sitting in quarantine, by the rule that put it there?
+    requires: [quarantine]
+    sql: |
+      SELECT dataset_name, rule, COUNT(*) AS records, MAX(rejected_at) AS last_rejected
+      FROM (
+        SELECT dataset_name, rejected_at, EXPLODE(SPLIT(failed_rules, ',')) AS rule
+        FROM quarantine
+      )
+      GROUP BY dataset_name, rule
+      ORDER BY records DESC
+
+  - name: schema_history
+    question: Where has the source schema moved, and was the change accepted?
+    requires: [ingestion_metadata]
+    sql: |
+      SELECT dataset_name, schema_version, schema_column_count,
+             MIN(started_at)     AS first_seen,
+             MAX(started_at)     AS last_seen,
+             COUNT(*)            AS runs,
+             MAX(schema_drift)      AS drift,
+             MAX(schema_violations) AS violations
+      FROM ingestion_metadata
+      GROUP BY dataset_name, schema_version, schema_column_count
+      ORDER BY dataset_name, first_seen
+
+  - name: failed_runs
+    question: What has failed, most recent first?
+    requires: [pipeline_runs]
+    sql: |
+      SELECT started_at, pipeline, entity, status, run_id
+      FROM pipeline_runs
+      WHERE status <> 'success'
+      ORDER BY started_at DESC
+
+  - name: analytical_refresh_cost
+    question: What does keeping the analytical layer up to date cost per refresh?
+    requires: [data_product_metadata]
+    sql: |
+      SELECT product_name,
+             COUNT(*)                                                   AS refreshes,
+             SUM(CASE WHEN refresh_mode = 'incremental' THEN 1 ELSE 0 END) AS incremental,
+             SUM(CASE WHEN refresh_mode = 'skipped'     THEN 1 ELSE 0 END) AS skipped,
+             ROUND(AVG(CAST(duration_sec AS DOUBLE)), 2)                AS avg_sec,
+             MAX(row_count)                                             AS rows_now
+      FROM data_product_metadata
+      GROUP BY product_name
+      ORDER BY avg_sec DESC

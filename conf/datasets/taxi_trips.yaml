@@ -36,6 +36,11 @@ required_columns:
   - DOLocationID
   - total_amount
 
+schema_policy:
+  on_new_column: allow
+  on_missing_column: fail
+  on_type_change: flag
+
 # Only columns needing a semantic rename are listed. Everything else, Airport_fee and
 # PULocationID included, is handled by the mechanical snake_case rule.
 rename:
@@ -129,6 +134,29 @@ quality:
       values: [1, 2, 6, 7]
       on_fail: flag
       name: unknown_vendor
+
+    - type: foreign_key
+      column: pu_location_id
+      references: {table: taxi_zones, column: location_id}
+      name: unknown_pickup_zone
+
+    - type: foreign_key
+      column: do_location_id
+      references: {table: taxi_zones, column: location_id}
+      name: unknown_dropoff_zone
+
+    - type: completeness
+      columns:
+        - fare_amount
+        - extra
+        - mta_tax
+        - tip_amount
+        - tolls_amount
+        - improvement_surcharge
+        - total_amount
+      min_present: 7
+      on_fail: flag
+      name: incomplete_fare_breakdown
 
 target:
   table: taxi_trips

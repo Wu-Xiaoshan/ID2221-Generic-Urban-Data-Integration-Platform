@@ -20,6 +20,11 @@ expected_columns:
 
 required_columns: [LocationID, Borough, Zone]
 
+schema_policy:
+  on_new_column: fail
+  on_missing_column: fail
+  on_type_change: fail
+
 rename: {}
 
 # The only dataset with no temporal dimension, which is why it is the lookup table.

@@ -47,6 +47,11 @@ required_columns:
   - Time GMT
   - Sample Measurement
 
+schema_policy:
+  on_new_column: allow
+  on_missing_column: fail
+  on_type_change: fail
+
 rename:
   Sample Measurement: pm25_ugm3_raw
 
@@ -112,6 +117,12 @@ quality:
       column: units_of_measure
       values: ["Micrograms/cubic meter (LC)"]
       name: unexpected_unit
+
+    - type: completeness
+      columns: [pm25_ugm3_raw, latitude, longitude, method_code]
+      min_present: 4
+      on_fail: flag
+      name: incomplete_reading
 
 target:
   table: air_quality_hourly

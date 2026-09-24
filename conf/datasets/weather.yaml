@@ -36,6 +36,11 @@ expected_columns:
 
 required_columns: [year, month, day, hour, temp]
 
+schema_policy:
+  on_new_column: allow
+  on_missing_column: fail
+  on_type_change: flag
+
 # Meteostat's short names carry no unit, and the units are not all metric-obvious
 # (wind is km/h, pressure hPa). The naming convention requires the unit in the name.
 rename:
@@ -111,6 +116,12 @@ quality:
       column: precipitation_mm
       min: 0
       name: negative_precipitation
+
+    - type: completeness
+      columns: [temp_c, humidity_pct, precipitation_mm, wind_speed_kmh, pressure_hpa]
+      min_present: 5
+      on_fail: flag
+      name: incomplete_observation
 
 target:
   table: weather_hourly

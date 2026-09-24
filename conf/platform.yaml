@@ -10,6 +10,13 @@ layers:
   products: products
   meta: _meta
 
+validation:
+  enabled: true
+  metrics: true
+
+monitoring:
+  enabled: true
+
 spark:
   app_name: urban-data-platform
   # Deliberately not local[*]. On a 16-core machine that starts 16 tasks that each

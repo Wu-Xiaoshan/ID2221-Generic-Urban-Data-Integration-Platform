@@ -91,6 +91,35 @@ def _default_rule_name(rule_type: str, params: dict[str, Any]) -> str:
 
 
 @dataclass(frozen=True)
+class SchemaPolicy:
+    """What the platform does when the source layout stops matching the config. Each setting is ``allow``, ``flag`` or ``fail``. A failure is isolated to the dataset that caused it.
+    The defaults are deliberately permissive, because a new column is the normal way these feeds evolve.
+    """
+
+    on_new_column: str = "allow"
+    on_missing_column: str = "flag"
+    on_type_change: str = "flag"
+    # New columns named here are always allowed, whatever on_new_column says.
+    allowed_new_columns: list[str] = field(default_factory=list)
+
+    @staticmethod
+    def parse(raw: dict[str, Any] | None) -> SchemaPolicy:
+        raw = raw or {}
+        policy = SchemaPolicy(
+            on_new_column=raw.get("on_new_column", "allow"),
+            on_missing_column=raw.get("on_missing_column", "flag"),
+            on_type_change=raw.get("on_type_change", "flag"),
+            allowed_new_columns=list(raw.get("allowed_new_columns", []) or []),
+        )
+        for setting in (policy.on_new_column, policy.on_missing_column, policy.on_type_change):
+            if setting not in ("allow", "flag", "fail"):
+                raise ValueError(
+                    f"schema_policy: '{setting}' is not one of allow / flag / fail"
+                )
+        return policy
+
+
+@dataclass(frozen=True)
 class SourceSpec:
     format: str
     path: str
@@ -145,6 +174,7 @@ class DatasetConfig:
     cast: dict[str, str] = field(default_factory=dict)
     primary_key: list[str] = field(default_factory=list)
     rules: list[QualityRule] = field(default_factory=list)
+    schema_policy: SchemaPolicy = field(default_factory=SchemaPolicy)
     incremental: IncrementalSpec | None = None
 
     def for_release(self, release: str) -> DatasetConfig:
@@ -182,6 +212,7 @@ class DatasetConfig:
                 for target, spec in (raw.get("timestamps", {}) or {}).items()
             ],
             cast=raw.get("cast", {}) or {},
+            schema_policy=SchemaPolicy.parse(raw.get("schema_policy")),
             primary_key=quality.get("primary_key", []) or [],
             rules=[QualityRule.parse(r) for r in (quality.get("rules", []) or [])],
             incremental=(
@@ -198,6 +229,21 @@ class PlatformConfig:
     raw_root: str
     layers: dict[str, str]
     spark: dict[str, Any]
+    # Both default to on. They are switched off only to measure what they cost, in the validation and monitoring overhead experiments.
+    validation: dict[str, Any] = field(default_factory=dict)
+    monitoring: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def validation_enabled(self) -> bool:
+        return bool(self.validation.get("enabled", True))
+
+    @property
+    def validation_metrics_enabled(self) -> bool:
+        return self.validation_enabled and bool(self.validation.get("metrics", True))
+
+    @property
+    def monitoring_enabled(self) -> bool:
+        return bool(self.monitoring.get("enabled", True))
 
     @staticmethod
     def load(path: str | None = None) -> PlatformConfig:
@@ -209,6 +255,8 @@ class PlatformConfig:
             raw_root=_abs(raw["raw_root"]),
             layers=raw["layers"],
             spark=raw.get("spark", {}),
+            validation=raw.get("validation", {}) or {},
+            monitoring=raw.get("monitoring", {}) or {},
         )
 
     def table_path(self, layer: str, table: str) -> str:

@@ -32,6 +32,12 @@ def write_delta(df: DataFrame, target: TargetSpec, path: str) -> None:
         writer = writer.partitionBy(*target.partition_by)
     if target.replace_where:
         writer = writer.option("replaceWhere", target.replace_where)
+    elif target.mode == "overwrite":
+        # A full reload replaces every row, so it may replace the layout too. Without
+        # this, adding a validation rule that contributes a dq_ column makes the next
+        # reload fail against the table the previous one wrote. Not set alongside
+        # replaceWhere, which overwrites only part of the table and rejects the option.
+        writer = writer.option("overwriteSchema", "true")
     writer.save(path)
 
 

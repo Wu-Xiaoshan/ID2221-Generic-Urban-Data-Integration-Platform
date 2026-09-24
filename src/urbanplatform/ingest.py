@@ -23,10 +23,16 @@ from pyspark.sql import DataFrame, SparkSession
 
 from . import transforms  # noqa: F401  (importing registers the dataset rules)
 from .config import DatasetConfig, PlatformConfig
-from .metadata import IngestionRun, write_metadata, write_quarantine
-from .quality import apply_rules, to_quarantine
-from .reader import read_source, validate_schema
+from .metadata import (
+    IngestionRun,
+    write_metadata,
+    write_quarantine,
+    write_validation_metrics,
+)
+from .quality import apply_rules, rule_outcomes, to_quarantine
+from .reader import SchemaViolation, read_source, validate_schema
 from .registry import apply_post_quality, apply_pre_quality, registered
+from .rules import RuleContext
 from .standardize import standardize
 from .writer import write_dataset
 
@@ -59,17 +65,35 @@ def ingest_dataset(
         raw, files = read_source(spark, cfg)
         run.source_files = ";".join(os.path.basename(f) for f in files)
 
-        run.set_schema_report(validate_schema(raw, cfg))
+        try:
+            run.set_schema_report(validate_schema(raw, cfg))
+        except SchemaViolation as exc:
+            run.set_schema_report(exc.report)
+            raise
 
         # Cached because the row count and the write both consume it, and for
         # air_quality re-reading means re-scanning 2.2 GB.
         df = apply_pre_quality(standardize(raw, cfg), cfg).cache()
         run.records_read = df.count()
 
-        clean, rejected = apply_rules(df, cfg)
-        run.records_rejected = rejected.count()
-        if run.records_rejected:
-            quarantined = to_quarantine(rejected, cfg, run_id)
+        if platform.validation_enabled:
+            ctx = RuleContext(spark=spark, platform=platform, cfg=cfg)
+            validated = apply_rules(df, cfg, ctx)
+            rejected = validated.rejected
+            if platform.validation_metrics_enabled:
+                # The row count and the per-rule counts are two passes over the same rows; without metrics there is only one, and no reason to cache.
+                rejected = rejected.cache()
+            run.records_rejected = rejected.count()
+            run.rule_outcomes = rule_outcomes(
+                validated, cfg, count=platform.validation_metrics_enabled
+            )
+            for skipped, reason in validated.skipped.items():
+                print(f"    rule '{skipped}' skipped: {reason}")
+            if run.records_rejected:
+                quarantined = to_quarantine(rejected, cfg, run_id)
+            clean = validated.clean
+        else:
+            clean, run.records_rejected = df, 0
 
         result = apply_post_quality(clean, cfg)
         merged = write_dataset(spark, result, cfg, target_path)
@@ -131,6 +155,8 @@ def ingest_all(
                 print(f"    schema drift: {run.schema_drift}")
         else:
             print(f"    FAILED: {run.error}")
+        if run.schema_violations:
+            print(f"    schema policy: {run.schema_violations}")
 
     if quarantines:
         combined = quarantines[0]
@@ -138,5 +164,7 @@ def ingest_all(
             combined = combined.unionByName(extra)
         write_quarantine(combined, platform.meta_path("quarantine"))
 
-    write_metadata(spark, runs, platform.meta_path("ingestion_metadata"))
+    if platform.monitoring_enabled:
+        write_metadata(spark, runs, platform.meta_path("ingestion_metadata"))
+        write_validation_metrics(spark, runs, platform.meta_path("validation_metrics"))
     return runs
