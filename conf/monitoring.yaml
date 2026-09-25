@@ -3,27 +3,29 @@ queries:
     question: Which dataset fails validation most frequently?
     requires: [validation_metrics]
     sql: |
-      -- A row that breaks three rules is three rule hits but one record, so the two
-      -- are counted separately: frequency is about runs, volume is about hits.
+      -- A failure is a rejected record. A flagged record is kept, so flag hits are
+      -- reported beside the failures, not counted among them. A record that breaks three
+      -- rules is three rule hits but one record, so hits are counted per rule.
       WITH per_run AS (
         SELECT dataset_name, run_id,
-               MAX(records_read)   AS records_read,
-               SUM(failed_records) AS rule_hits,
-               SUM(CASE WHEN failed_records > 0 THEN 1 ELSE 0 END) AS rules_failed
+               MAX(records_read) AS records_read,
+               SUM(CASE WHEN on_fail = 'reject' THEN failed_records ELSE 0 END) AS reject_hits,
+               SUM(CASE WHEN on_fail = 'flag'   THEN failed_records ELSE 0 END) AS flag_hits
         FROM validation_metrics
         WHERE status = 'applied'
         GROUP BY dataset_name, run_id
       )
       SELECT dataset_name,
              COUNT(*)                                                AS runs,
-             SUM(CASE WHEN rules_failed > 0 THEN 1 ELSE 0 END)       AS runs_with_failures,
-             ROUND(100.0 * SUM(CASE WHEN rules_failed > 0 THEN 1 ELSE 0 END)
-                   / COUNT(*), 1)                                    AS pct_runs_failing,
-             SUM(rule_hits)                                          AS rule_hits,
-             ROUND(100.0 * SUM(rule_hits) / NULLIF(SUM(records_read), 0), 4) AS hits_per_100_reads
+             SUM(CASE WHEN reject_hits > 0 THEN 1 ELSE 0 END)        AS runs_with_rejections,
+             ROUND(100.0 * SUM(CASE WHEN reject_hits > 0 THEN 1 ELSE 0 END)
+                   / COUNT(*), 1)                                    AS pct_runs_rejecting,
+             SUM(reject_hits)                                        AS reject_hits,
+             ROUND(100.0 * SUM(reject_hits) / NULLIF(SUM(records_read), 0), 4) AS reject_hits_per_100_reads,
+             SUM(flag_hits)                                          AS flag_hits
       FROM per_run
       GROUP BY dataset_name
-      ORDER BY pct_runs_failing DESC, rule_hits DESC
+      ORDER BY pct_runs_rejecting DESC, reject_hits DESC
 
   - name: failing_rules
     question: Which individual rules catch the most records?
@@ -57,7 +59,9 @@ queries:
     question: Which dataset requires the longest processing time?
     requires: [pipeline_runs]
     sql: |
-      SELECT entity, pipeline,
+      -- Averaged within one mode: a full rebuild and a refresh that found nothing to do
+      -- are both runs of the same step, but their times say different things.
+      SELECT entity, pipeline, mode,
              COUNT(*)                       AS executions,
              ROUND(AVG(duration_sec), 2)    AS avg_sec,
              ROUND(MAX(duration_sec), 2)    AS max_sec,
@@ -65,7 +69,7 @@ queries:
              SUM(records_read)              AS records_read
       FROM pipeline_runs
       WHERE status = 'success'
-      GROUP BY entity, pipeline
+      GROUP BY entity, pipeline, mode
       ORDER BY avg_sec DESC
 
   - name: rejected_per_execution
@@ -88,15 +92,16 @@ queries:
     question: How has processing time changed over multiple executions?
     requires: [pipeline_runs]
     sql: |
-      SELECT entity, pipeline, started_at,
+      -- Each run is compared with the previous run of the same step in the same mode.
+      SELECT entity, pipeline, mode, started_at,
              ROUND(duration_sec, 2) AS duration_sec,
              ROUND(duration_sec - LAG(duration_sec) OVER (
-                   PARTITION BY entity ORDER BY started_at), 2) AS delta_vs_previous,
+                   PARTITION BY entity, pipeline, mode ORDER BY started_at), 2) AS delta_vs_previous,
              records_read,
              ROUND(records_read / NULLIF(duration_sec, 0), 0) AS records_per_sec
       FROM pipeline_runs
       WHERE status = 'success' AND duration_sec IS NOT NULL
-      ORDER BY entity, started_at
+      ORDER BY entity, pipeline, mode, started_at
 
   - name: quarantine_by_rule
     question: What is actually sitting in quarantine, by the rule that put it there?
@@ -128,7 +133,7 @@ queries:
     question: What has failed, most recent first?
     requires: [pipeline_runs]
     sql: |
-      SELECT started_at, pipeline, entity, status, run_id
+      SELECT started_at, pipeline, mode, entity, status, run_id
       FROM pipeline_runs
       WHERE status <> 'success'
       ORDER BY started_at DESC

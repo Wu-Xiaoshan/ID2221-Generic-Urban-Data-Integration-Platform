@@ -90,7 +90,12 @@ def ingest_dataset(
             for skipped, reason in validated.skipped.items():
                 print(f"    rule '{skipped}' skipped: {reason}")
             if run.records_rejected:
-                quarantined = to_quarantine(rejected, cfg, run_id)
+                # Materialised now, while the rejected rows are still cached. The
+                # quarantine is written after every dataset has run, and by then the
+                # source frame is no longer cached, so a lazy frame would recompute it.
+                quarantined = to_quarantine(rejected, cfg, run_id).cache()
+                quarantined.count()
+            rejected.unpersist()
             clean = validated.clean
         else:
             clean, run.records_rejected = df, 0
@@ -163,6 +168,8 @@ def ingest_all(
         for extra in quarantines[1:]:
             combined = combined.unionByName(extra)
         write_quarantine(combined, platform.meta_path("quarantine"))
+        for quarantined in quarantines:
+            quarantined.unpersist()
 
     if platform.monitoring_enabled:
         write_metadata(spark, runs, platform.meta_path("ingestion_metadata"))

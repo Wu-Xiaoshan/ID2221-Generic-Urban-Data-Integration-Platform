@@ -168,9 +168,8 @@ To see what changed in each run:
 
 ## Monitoring
 
-Every job appends a record of what it did to a Delta table under `data/lakehouse/_meta/`. Five
-tables sit at three different grains, so a question can be answered at the level it belongs to
-rather than by reading logs.
+Every job appends a record of what it did to a Delta table under `data/lakehouse/_meta/`. The
+five tables have three grains: one row per run, per rule, or per rejected record.
 
 | Table | One row per | What it records |
 |---|---|---|
@@ -180,10 +179,11 @@ rather than by reading logs.
 | `integration_metadata` | integration or refresh run | status, duration, mode (full, incremental or skipped) and the reason for a full rebuild, rows inserted, updated and deleted, the silver versions read, trips in and out, how many trips got exact, filled or missing weather and air quality |
 | `data_product_metadata` | product per refresh | status, duration, mode (full, incremental or skipped), the months rewritten, source table and version, schema version, rows, files, size |
 
-Three of those tables record runs, but each counts something different: ingestion counts records,
-integration counts trips, a data product counts rows. `jobs/run_monitoring.py` registers a view
-called `pipeline_runs` that maps all three onto one set of columns, so "which step is slowest" is
-one query instead of three.
+Three of them record runs, but ingestion counts records, integration trips and a data product rows.
+`jobs/run_monitoring.py` registers a view, `pipeline_runs`, that maps all three onto one set of
+columns, so one query can compare every step. Its `mode` column keeps full runs, incremental runs
+and skipped runs apart, since a full rebuild of gold and a refresh that found nothing to do take
+very different times.
 
 ### Reading the report
 
@@ -195,20 +195,19 @@ python jobs/run_monitoring.py --sql "SELECT * FROM pipeline_runs ORDER BY starte
 ```
 
 The job only reads. It writes nothing to the lakehouse, and each run leaves a copy of its output in
-`reports/monitoring/<timestamp>.md`. A question whose table has not been written yet is reported as
-skipped rather than failing the report, which is what happens on a fresh platform where no product
-has been built.
+`reports/monitoring/<timestamp>.md`. A question whose table has not been written yet, as on a fresh
+platform with no products, is reported as skipped and the rest of the report still runs.
 
 Ten questions ship with the platform:
 
 | Question | Answers |
 |---|---|
-| `validation_failures_by_dataset` | which dataset fails validation most often |
+| `validation_failures_by_dataset` | which dataset has records rejected most often, with flagged records counted separately |
 | `failing_rules` | which individual rules catch the most records |
 | `unapplied_rules` | which rules did not run, or ran without being counted |
-| `slowest_datasets` | which dataset takes longest, averaged over its runs |
+| `slowest_datasets` | which step takes longest, averaged over its runs of the same mode |
 | `rejected_per_execution` | how many records each execution rejected |
-| `processing_time_trend` | how each step's duration has moved, run by run |
+| `processing_time_trend` | how each step's duration has moved, run by run, within one mode |
 | `quarantine_by_rule` | what is sitting in quarantine and which rule put it there |
 | `schema_history` | where a source schema moved, and whether the change was accepted |
 | `failed_runs` | what has failed, most recent first |
@@ -229,14 +228,14 @@ Append an entry to `conf/monitoring.yaml`. No code changes.
       GROUP BY dataset_name
 ```
 
-`requires` names the views the query reads. Listing them is what lets the report skip a question
-cleanly instead of raising when a table is missing.
+`requires` names the views the query reads, so the report can skip the question when one of them
+is missing.
 
 ### Switching it off
 
 `monitoring.enabled: false` in `conf/platform.yaml` stops every metadata write. The pipelines still
-run and still validate; they just leave no record. This exists to measure what monitoring costs, and
-it is not a normal operating mode.
+run and validate but leave no record. The switch exists to measure what monitoring costs and is not
+meant for normal operation.
 
 ## Validation reports
 
@@ -257,12 +256,8 @@ with the platform, none of which knows anything about a particular dataset:
 A rule either rejects a record or flags it. A rejected record goes to `_meta/quarantine` with the
 names of the rules it failed and the whole record as JSON, and it never reaches gold or the data
 products. A flagged record stays in the table with a `dq_<rule>` column set to true, which suits an
-anomaly that is suspicious without being wrong. Zero-distance trips are flagged, not dropped: there
+anomaly that is suspicious without being wrong. Zero-distance trips are flagged and kept: there
 are 213,300 of them in the original files, and they are real records of real transactions.
-
-A failing dataset does not stop the run. Each dataset is ingested inside its own error boundary, so
-the three others in the same run finish normally and the failure is recorded against the one that
-caused it.
 
 ### What each rule did
 
@@ -282,14 +277,14 @@ caused it.
 | `skipped` | the rule could not run, and `note` says why |
 | `uncounted` | the rule ran, but its result could not be measured |
 
-The distinction matters more than it looks. A `foreign_key` rule whose reference table has not been
-built yet is skipped, and reporting that as zero failures would claim the data is clean when nothing
-checked it. `unapplied_rules` in the monitoring report lists everything that is not `applied`.
+A `foreign_key` rule whose reference table has not been built yet is skipped. Reporting it as zero
+failures would claim the data is clean when nothing checked it. `unapplied_rules` in the monitoring
+report lists everything that is not `applied`.
 
 ### Schema changes
 
-Rule types check records. A change to the source's layout is a property of the whole file, so it is
-handled separately, by the `schema_policy` block in each dataset's config:
+A change to the source's layout concerns the whole file, not single records, so the
+`schema_policy` block in each dataset's config handles it, apart from the rules:
 
 ```yaml
 schema_policy:
@@ -301,16 +296,15 @@ schema_policy:
 `allow` records the change and carries on, `flag` records it as a violation and carries on, `fail`
 stops that dataset. The three time-series feeds allow new columns, because that is how they evolve:
 v2 adds `humidity` to weather and `aqi` to air quality, and both arrive without anyone editing a
-config. `taxi_zones` fails on any new column instead. It is the conformed dimension every join
-depends on, it has no incremental releases, and a column appearing in it means something upstream
-changed that nobody planned for.
+config. `taxi_zones` fails on any new column: every join depends on it, it has no incremental
+releases, and a new column there means an unplanned change upstream.
 
 Violations are written to `schema_violations` in `ingestion_metadata` whether or not they stopped
 the run, so `flag` is visible without reading the logs.
 
 ### Adding a rule type
 
-Write a function and register it. The engine in `src/urbanplatform/quality.py` is never touched.
+Write a function and register it. The engine in `src/urbanplatform/quality.py` does not change.
 
 ```python
 from .rules import predicate

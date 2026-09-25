@@ -97,6 +97,10 @@ PRODUCT_METADATA_SCHEMA = StructType(
         StructField("refresh_mode", StringType(), True),
         StructField("refreshed_partitions", StringType(), True),
         StructField("note", StringType(), True),
+        # When the run itself started and ended. refreshed_at is when the product's data
+        # last changed, which for a skipped run is an earlier refresh.
+        StructField("started_at", TimestampType(), True),
+        StructField("finished_at", TimestampType(), True),
     ]
 )
 
@@ -122,6 +126,8 @@ class ProductRun:
     refresh_mode: str | None = None
     refreshed_partitions: str | None = None
     note: str | None = None
+    started_at: Any = None
+    finished_at: Any = None
 
     def to_row(self) -> tuple:
         data = dataclasses.asdict(self)
@@ -197,6 +203,7 @@ def refresh_product(
         schema_version=spec.schema_version,
         target_path=target_path,
         partition_by=",".join(spec.partition_by) or None,
+        started_at=dt.datetime.now(),
     )
     started = time.perf_counter()
     filtered_views = False
@@ -287,6 +294,7 @@ def refresh_product(
     finally:
         if filtered_views:
             register_views(spark, platform, analytics)
+        run.finished_at = dt.datetime.now()
         run.duration_sec = f"{time.perf_counter() - started:.2f}"
     return run
 

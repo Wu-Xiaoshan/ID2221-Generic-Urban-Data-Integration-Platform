@@ -45,15 +45,22 @@ _LATE_COLUMNS = {
         "refresh_mode": "string",
         "refreshed_partitions": "string",
         "note": "string",
+        "started_at": "timestamp",
+        "finished_at": "timestamp",
     },
 }
 
 # Each pipeline's run table, mapped onto the shared column list. duration_sec is stored
 # as a string everywhere (it is formatted at write time), so it is cast here.
+#
+# mode separates runs that did different amounts of work: a full load or rebuild, an
+# incremental update or refresh, and a refresh that found nothing to do. Their durations
+# are only comparable within one mode.
 _PIPELINE_RUN_PARTS = {
     "ingestion_metadata": """
         SELECT run_id,
                CASE WHEN release IS NULL THEN 'ingest' ELSE 'update' END AS pipeline,
+               CASE WHEN release IS NULL THEN 'full' ELSE 'incremental' END AS mode,
                dataset_name AS entity,
                status,
                started_at,
@@ -69,6 +76,7 @@ _PIPELINE_RUN_PARTS = {
     "integration_metadata": """
         SELECT run_id,
                'integrate' AS pipeline,
+               COALESCE(mode, 'full') AS mode,
                target_table AS entity,
                status,
                started_at,
@@ -84,10 +92,13 @@ _PIPELINE_RUN_PARTS = {
     "data_product_metadata": """
         SELECT run_id,
                'product' AS pipeline,
+               COALESCE(refresh_mode, 'full') AS mode,
                product_name AS entity,
                status,
-               refreshed_at AS started_at,
-               refreshed_at AS finished_at,
+               -- Rows written before run times were recorded fall back to refreshed_at: the
+               -- run's time for a refresh, but an earlier time for a skipped run.
+               COALESCE(started_at, refreshed_at) AS started_at,
+               COALESCE(finished_at, refreshed_at) AS finished_at,
                CAST(duration_sec AS DOUBLE) AS duration_sec,
                CAST(NULL AS BIGINT) AS records_read,
                row_count AS records_written,
