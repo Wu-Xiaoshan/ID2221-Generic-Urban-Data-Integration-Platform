@@ -65,11 +65,22 @@ def _completeness(rule: QualityRule, df: DataFrame) -> Column:
     """A row is incomplete when too few of the listed columns carry a value.
 
     ``not_null`` demands every column; this one demands a quorum, which is what an
-    optional-but-not-all-optional block of attributes needs. Columns absent from the
-    frame count as missing rather than raising, so a source that stopped sending a
-    field is reported as incomplete data instead of crashing the run.
+    optional-but-not-all-optional block of attributes needs.
+
+    A column that is not in the frame counts as missing, which is the right reading for
+    a flag: a source that stopped sending a field is reported as incomplete data rather
+    than crashing the run. A rejecting rule cannot be treated that way. Every record
+    would fail it and the whole dataset would be deleted, so the rule stops the dataset
+    instead and the run record says which columns were not there.
     """
     columns = rule.params.get("columns") or [rule.params["column"]]
+    absent = [c for c in columns if c not in df.columns]
+    if absent and rule.on_fail == "reject":
+        raise ValueError(
+            f"rule '{rule.name}': column(s) {', '.join(absent)} are not in the frame. "
+            "Rejecting on that would remove every record."
+        )
+
     present = [
         F.when(F.col(c).isNotNull(), F.lit(1)).otherwise(F.lit(0)) if c in df.columns else F.lit(0)
         for c in columns
@@ -99,10 +110,14 @@ def _unique(rule: QualityRule, df: DataFrame, ctx: RuleContext) -> DataFrame:
 @frame_rule("foreign_key")
 def _foreign_key(rule: QualityRule, df: DataFrame, ctx: RuleContext) -> DataFrame:
     """
-    If the referenced table does not exist yet the rule is skipped and the skip is
-    reported, rather than failing the run. On a first load the datasets are ingested in
-    one pass and the dimension may not be written at the moment the fact is checked;
-    the next run then validates it for real.
+    The rule is skipped, and the skip reported, whenever there is nothing to match
+    against: no table yet, or a table with no usable keys. On a first load the datasets
+    are ingested in one pass and the dimension may not be written at the moment the
+    fact is checked; the next run then validates it for real.
+
+    Skipping matters because the alternative is silent. An empty dimension matches no
+    record, so every record would be rejected and reported as a genuine violation. A
+    dimension that failed to load would take the fact table with it.
     """
     reference = rule.params["references"]
     keys = ctx.table(reference.get("layer", "silver"), reference["table"])
@@ -112,7 +127,17 @@ def _foreign_key(rule: QualityRule, df: DataFrame, ctx: RuleContext) -> DataFram
 
     column = rule.params["column"]
     probe = "_fk_" + rule.name
-    keys = keys.select(F.col(reference["column"]).alias(probe)).distinct()
+    # Nulls are dropped because equality never matches one anyway. That also makes the
+    # emptiness test below mean "no keys to match against" rather than "no rows".
+    keys = (
+        keys.select(F.col(reference["column"]).alias(probe))
+        .where(F.col(probe).isNotNull())
+        .distinct()
+    )
+    if keys.isEmpty():
+        ctx.skip(rule, f"{reference['table']}.{reference['column']} holds no values")
+        return df
+
     joined = df.join(F.broadcast(keys), df[column] == F.col(probe), "left")
     missing = F.col(column).isNotNull() & F.col(probe).isNull()
     return mark_failed(joined, rule, missing).drop(probe)
