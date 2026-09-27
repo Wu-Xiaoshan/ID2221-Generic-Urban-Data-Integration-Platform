@@ -259,6 +259,17 @@ products. A flagged record stays in the table with a `dq_<rule>` column set to t
 anomaly that is suspicious without being wrong. Zero-distance trips are flagged and kept: there
 are 213,300 of them in the original files, and they are real records of real transactions.
 
+### Generating a validation report
+
+```bash
+python jobs/run_monitoring.py validation_failures_by_dataset failing_rules unapplied_rules quarantine_by_rule
+```
+
+This runs the four validation questions from `conf/monitoring.yaml`: which dataset has records
+rejected most often, which rules catch the most records, which rules did not run, and what is in
+quarantine. It prints the answers and writes them to `reports/monitoring/<timestamp>.md`. It reads
+the metadata of runs that have already happened, so run an ingestion or an update first.
+
 ### What each rule did
 
 `_meta/validation_metrics` holds one row per rule per run, whether or not the rule caught anything:
@@ -363,6 +374,14 @@ reads that variable, so the same works by hand:
 
 ```bash
 URBANPLATFORM_CONFIG=/tmp/platform-no-monitoring.yaml python jobs/run_update.py v2
+```
+
+In PowerShell, set the variable first; it lasts until the window is closed:
+
+```powershell
+$env:URBANPLATFORM_CONFIG = "C:\temp\platform-no-monitoring.yaml"
+python jobs/run_update.py v2
+Remove-Item Env:URBANPLATFORM_CONFIG
 ```
 
 Each run is a separate process, and its wall-clock time includes starting Spark, about 11 s. Runs
