@@ -318,5 +318,6 @@ def refresh_products(
         runs.append(
             refresh_product(spark, platform, analytics, products, spec, run_id, if_stale, incremental)
         )
-    write_product_metadata(spark, runs, platform.meta_path("data_product_metadata"))
+    if platform.monitoring_enabled:
+        write_product_metadata(spark, runs, platform.meta_path("data_product_metadata"))
     return runs

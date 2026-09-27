@@ -28,6 +28,9 @@
 # not work on another machine.
 /data/lakehouse/
 
+# Copies of the lakehouse that jobs/run_evaluation.py restores before every run.
+/data/snapshots/
+
 # Python
 __pycache__/
 *.pyc

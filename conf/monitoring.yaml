@@ -135,7 +135,9 @@ queries:
     sql: |
       SELECT started_at, pipeline, mode, entity, status, run_id
       FROM pipeline_runs
-      WHERE status <> 'success'
+      -- A skipped refresh found nothing to do; it did not fail. Anything else that is not a
+      -- success is listed, so a status added later cannot be hidden by this filter.
+      WHERE status NOT IN ('success', 'skipped')
       ORDER BY started_at DESC
 
   - name: analytical_refresh_cost

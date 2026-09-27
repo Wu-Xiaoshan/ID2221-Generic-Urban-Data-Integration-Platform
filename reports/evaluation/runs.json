@@ -1,0 +1,560 @@
+[
+ {
+  "run": "update",
+  "rep": 1,
+  "started_at": "2026-09-27T03:05:40",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {},
+  "wall_sec": 213.356,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update.1.log"
+ },
+ {
+  "run": "update_no_metrics",
+  "rep": 1,
+  "started_at": "2026-09-27T03:09:16",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {
+   "validation": {
+    "metrics": false
+   }
+  },
+  "wall_sec": 186.278,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_no_metrics.1.log"
+ },
+ {
+  "run": "update_no_validation",
+  "rep": 1,
+  "started_at": "2026-09-27T03:12:24",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {
+   "validation": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 146.688,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_no_validation.1.log"
+ },
+ {
+  "run": "update_no_monitoring",
+  "rep": 1,
+  "started_at": "2026-09-27T03:14:53",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {
+   "monitoring": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 186.937,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_no_monitoring.1.log"
+ },
+ {
+  "run": "ingest",
+  "rep": 1,
+  "started_at": "2026-09-27T03:18:02",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_ingest.py"
+  ],
+  "overrides": {},
+  "wall_sec": 303.947,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\ingest.1.log"
+ },
+ {
+  "run": "ingest_no_metrics",
+  "rep": 1,
+  "started_at": "2026-09-27T03:23:07",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_ingest.py"
+  ],
+  "overrides": {
+   "validation": {
+    "metrics": false
+   }
+  },
+  "wall_sec": 198.038,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\ingest_no_metrics.1.log"
+ },
+ {
+  "run": "ingest_no_validation",
+  "rep": 1,
+  "started_at": "2026-09-27T03:26:27",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_ingest.py"
+  ],
+  "overrides": {
+   "validation": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 140.018,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\ingest_no_validation.1.log"
+ },
+ {
+  "run": "refresh",
+  "rep": 1,
+  "started_at": "2026-09-27T03:28:49",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_refresh.py"
+  ],
+  "overrides": {},
+  "wall_sec": 148.429,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh.1.log"
+ },
+ {
+  "run": "refresh_full",
+  "rep": 1,
+  "started_at": "2026-09-27T03:31:19",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_refresh.py",
+   "--full"
+  ],
+  "overrides": {},
+  "wall_sec": 248.64,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh_full.1.log"
+ },
+ {
+  "run": "refresh_no_monitoring",
+  "rep": 1,
+  "started_at": "2026-09-27T03:35:29",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_refresh.py"
+  ],
+  "overrides": {
+   "monitoring": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 130.866,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh_no_monitoring.1.log"
+ },
+ {
+  "run": "update_repeat",
+  "rep": 1,
+  "started_at": "2026-09-27T03:37:41",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {},
+  "wall_sec": 79.583,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_repeat.1.log"
+ },
+ {
+  "run": "refresh_noop",
+  "rep": 1,
+  "started_at": "2026-09-27T03:39:04",
+  "snapshot": "C",
+  "command": [
+   "jobs/run_refresh.py"
+  ],
+  "overrides": {},
+  "wall_sec": 55.582,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh_noop.1.log"
+ },
+ {
+  "run": "refresh_noop",
+  "rep": 2,
+  "started_at": "2026-09-27T03:40:01",
+  "snapshot": "C",
+  "command": [
+   "jobs/run_refresh.py"
+  ],
+  "overrides": {},
+  "wall_sec": 58.057,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh_noop.2.log"
+ },
+ {
+  "run": "update_repeat",
+  "rep": 2,
+  "started_at": "2026-09-27T03:41:00",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {},
+  "wall_sec": 77.032,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_repeat.2.log"
+ },
+ {
+  "run": "refresh_no_monitoring",
+  "rep": 2,
+  "started_at": "2026-09-27T03:42:19",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_refresh.py"
+  ],
+  "overrides": {
+   "monitoring": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 130.201,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh_no_monitoring.2.log"
+ },
+ {
+  "run": "refresh_full",
+  "rep": 2,
+  "started_at": "2026-09-27T03:44:31",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_refresh.py",
+   "--full"
+  ],
+  "overrides": {},
+  "wall_sec": 237.171,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh_full.2.log"
+ },
+ {
+  "run": "refresh",
+  "rep": 2,
+  "started_at": "2026-09-27T03:48:29",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_refresh.py"
+  ],
+  "overrides": {},
+  "wall_sec": 144.9,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh.2.log"
+ },
+ {
+  "run": "ingest_no_validation",
+  "rep": 2,
+  "started_at": "2026-09-27T03:50:56",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_ingest.py"
+  ],
+  "overrides": {
+   "validation": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 137.238,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\ingest_no_validation.2.log"
+ },
+ {
+  "run": "ingest_no_metrics",
+  "rep": 2,
+  "started_at": "2026-09-27T03:53:15",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_ingest.py"
+  ],
+  "overrides": {
+   "validation": {
+    "metrics": false
+   }
+  },
+  "wall_sec": 194.765,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\ingest_no_metrics.2.log"
+ },
+ {
+  "run": "ingest",
+  "rep": 2,
+  "started_at": "2026-09-27T03:56:31",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_ingest.py"
+  ],
+  "overrides": {},
+  "wall_sec": 213.464,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\ingest.2.log"
+ },
+ {
+  "run": "update_no_monitoring",
+  "rep": 2,
+  "started_at": "2026-09-27T04:00:06",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {
+   "monitoring": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 87.308,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_no_monitoring.2.log"
+ },
+ {
+  "run": "update_no_validation",
+  "rep": 2,
+  "started_at": "2026-09-27T04:01:35",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {
+   "validation": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 79.239,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_no_validation.2.log"
+ },
+ {
+  "run": "update_no_metrics",
+  "rep": 2,
+  "started_at": "2026-09-27T04:02:55",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {
+   "validation": {
+    "metrics": false
+   }
+  },
+  "wall_sec": 102.217,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_no_metrics.2.log"
+ },
+ {
+  "run": "update",
+  "rep": 2,
+  "started_at": "2026-09-27T04:04:39",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {},
+  "wall_sec": 100.136,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update.2.log"
+ },
+ {
+  "run": "update",
+  "rep": 3,
+  "started_at": "2026-09-27T04:06:21",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {},
+  "wall_sec": 100.522,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update.3.log"
+ },
+ {
+  "run": "update_no_metrics",
+  "rep": 3,
+  "started_at": "2026-09-27T04:08:03",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {
+   "validation": {
+    "metrics": false
+   }
+  },
+  "wall_sec": 99.267,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_no_metrics.3.log"
+ },
+ {
+  "run": "update_no_validation",
+  "rep": 3,
+  "started_at": "2026-09-27T04:09:43",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {
+   "validation": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 77.234,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_no_validation.3.log"
+ },
+ {
+  "run": "update_no_monitoring",
+  "rep": 3,
+  "started_at": "2026-09-27T04:11:02",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {
+   "monitoring": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 83.726,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_no_monitoring.3.log"
+ },
+ {
+  "run": "ingest",
+  "rep": 3,
+  "started_at": "2026-09-27T04:12:27",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_ingest.py"
+  ],
+  "overrides": {},
+  "wall_sec": 207.335,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\ingest.3.log"
+ },
+ {
+  "run": "ingest_no_metrics",
+  "rep": 3,
+  "started_at": "2026-09-27T04:15:56",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_ingest.py"
+  ],
+  "overrides": {
+   "validation": {
+    "metrics": false
+   }
+  },
+  "wall_sec": 214.311,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\ingest_no_metrics.3.log"
+ },
+ {
+  "run": "ingest_no_validation",
+  "rep": 3,
+  "started_at": "2026-09-27T04:19:32",
+  "snapshot": "A",
+  "command": [
+   "jobs/run_ingest.py"
+  ],
+  "overrides": {
+   "validation": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 136.614,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\ingest_no_validation.3.log"
+ },
+ {
+  "run": "refresh",
+  "rep": 3,
+  "started_at": "2026-09-27T04:21:50",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_refresh.py"
+  ],
+  "overrides": {},
+  "wall_sec": 155.776,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh.3.log"
+ },
+ {
+  "run": "refresh_full",
+  "rep": 3,
+  "started_at": "2026-09-27T04:24:28",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_refresh.py",
+   "--full"
+  ],
+  "overrides": {},
+  "wall_sec": 251.148,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh_full.3.log"
+ },
+ {
+  "run": "refresh_no_monitoring",
+  "rep": 3,
+  "started_at": "2026-09-27T04:28:40",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_refresh.py"
+  ],
+  "overrides": {
+   "monitoring": {
+    "enabled": false
+   }
+  },
+  "wall_sec": 137.602,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh_no_monitoring.3.log"
+ },
+ {
+  "run": "update_repeat",
+  "rep": 3,
+  "started_at": "2026-09-27T04:31:00",
+  "snapshot": "B",
+  "command": [
+   "jobs/run_update.py",
+   "v2"
+  ],
+  "overrides": {},
+  "wall_sec": 85.076,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\update_repeat.3.log"
+ },
+ {
+  "run": "refresh_noop",
+  "rep": 3,
+  "started_at": "2026-09-27T04:32:26",
+  "snapshot": "C",
+  "command": [
+   "jobs/run_refresh.py"
+  ],
+  "overrides": {},
+  "wall_sec": 61.871,
+  "exit_code": 0,
+  "log": "data\\snapshots\\logs\\refresh_noop.3.log"
+ }
+]

@@ -397,7 +397,8 @@ def run_integration(
     finally:
         run.finished_at = dt.datetime.now()
         run.duration_sec = f"{time.perf_counter() - started:.2f}"
-        write_integration_metadata(spark, run, platform.meta_path("integration_metadata"))
+        if platform.monitoring_enabled:
+            write_integration_metadata(spark, run, platform.meta_path("integration_metadata"))
     return run
 
 
@@ -607,5 +608,6 @@ def refresh_integration(spark: SparkSession, platform: PlatformConfig, cfg: Inte
     finally:
         run.finished_at = dt.datetime.now()
         run.duration_sec = f"{time.perf_counter() - started:.2f}"
-        write_integration_metadata(spark, run, platform.meta_path("integration_metadata"))
+        if platform.monitoring_enabled:
+            write_integration_metadata(spark, run, platform.meta_path("integration_metadata"))
     return run

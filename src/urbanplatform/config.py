@@ -247,7 +247,10 @@ class PlatformConfig:
 
     @staticmethod
     def load(path: str | None = None) -> PlatformConfig:
-        path = path or os.path.join(REPO_ROOT, "conf", "platform.yaml")
+        # URBANPLATFORM_CONFIG points a run at another file, so the evaluation experiments can
+        # switch validation and monitoring off without editing conf/platform.yaml.
+        path = (path or os.environ.get("URBANPLATFORM_CONFIG")
+                or os.path.join(REPO_ROOT, "conf", "platform.yaml"))
         with open(path, "r", encoding="utf-8") as fh:
             raw = yaml.safe_load(fh)
         return PlatformConfig(

@@ -336,6 +336,43 @@ python scripts/verify_analytics.py        # the analytical queries' invariants
 python scripts/verify_products.py         # the data products against their sources
 ```
 
+## Reproducing the evaluation
+
+The Week 3 evaluation measures what incremental processing, validation and monitoring cost.
+`jobs/run_evaluation.py` runs every measurement and writes `reports/evaluation/measurements.md`
+(timings, comparisons and storage) and `reports/evaluation/runs.json` (one record per run).
+
+```bash
+python scripts/generate_updates.py           # release v2, if it is not there yet
+python jobs/run_evaluation.py --prepare      # rebuild from data/raw and take snapshots A, B and C
+python jobs/run_evaluation.py                # 12 runs, 3 repeats each, about 1.5 hours
+python jobs/run_evaluation.py --resume       # continue after an interruption
+python jobs/run_evaluation.py --only refresh refresh_full --repeats 5
+```
+
+An update changes the data it runs on, so it cannot simply be run again: a second application of
+a release inserts nothing. Every run therefore starts from a copy of a snapshot restored into
+`data/lakehouse/`. Snapshot A is the initial load, B is A with release v2 merged into silver, and C
+is B after the refresh. The copies live in `data/snapshots/` (about 5 GB, not committed). `_meta`
+is not restored, so the monitoring history accumulates across runs; nothing that decides what to
+refresh reads it.
+
+Single runs switch validation or monitoring off through a temporary copy of `conf/platform.yaml`
+whose path is passed in `URBANPLATFORM_CONFIG`, so the committed file is never edited. Every job
+reads that variable, so the same works by hand:
+
+```bash
+URBANPLATFORM_CONFIG=/tmp/platform-no-monitoring.yaml python jobs/run_update.py v2
+```
+
+Each run is a separate process, and its wall-clock time includes starting Spark, about 11 s. Runs
+are interleaved, the order reverses on every other repeat, and the median of three is reported.
+On Windows the script keeps the machine out of Modern Standby while it runs: a laptop whose screen
+turns off throttles the jobs and reports no error. Other heavy programs running at the same time
+distort the timings in the same way.
+
+The results and their discussion are in `EvaluationReportWeek3.docx`.
+
 ## Analytical layer
 
 Twelve Spark SQL queries and four materialised data products read `gold/integrated_taxi_trips`.
@@ -374,6 +411,8 @@ of its update files and the merge key.
 ## Project layout
 
 ```
+DesignReportWeek3.docx        the Week 3 design report
+EvaluationReportWeek3.docx    the Week 3 evaluation report
 DesignReportWeek2.pdf         the Week 2 design report
 BenchmarkReportWeek2.pdf      the Week 2 benchmark report
 README.md                     this file
@@ -401,8 +440,10 @@ docs/common_data_model.md     the common data model, with every column transform
 reports/query_benchmark/      written by run_query_benchmark.py
 reports/updates/              written by generate_updates.py and verify_incremental.py
 reports/monitoring/           written by run_monitoring.py, one file per run
+reports/evaluation/           written by run_evaluation.py: measurements.md and runs.json
 data/raw/                     source files, not included (see Setup)
 data/updates/                 incremental releases, written by generate_updates.py, not included
+data/snapshots/               lakehouse copies run_evaluation.py restores before each run, not included
 data/lakehouse/               created by the jobs
   silver/                     one Delta table per dataset
   gold/                       integrated_taxi_trips
@@ -430,4 +471,5 @@ data/lakehouse/               created by the jobs
 | `scripts/verify_products.py` | checks the data products against their sources, and their metadata | yes |
 | `jobs/run_benchmark.py` | Week 1: rewrites the fact table two ways and measures both | yes |
 | `jobs/run_query_benchmark.py` | Week 2: runs the query optimisation experiments | yes |
+| `jobs/run_evaluation.py` | Week 3: runs the evaluation experiments from snapshots and measures storage | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
