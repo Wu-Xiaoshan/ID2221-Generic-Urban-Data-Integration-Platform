@@ -115,9 +115,9 @@ reads the silver change feeds from there:
   over the whole period, so any change to the trips rebuilds them. A product whose trips did not
   change is skipped.
 
-For v2 the refresh inserted 668,620 trips into gold in 113 s, against 241 s for a full
+For v2 the refresh inserted 668,620 trips into gold in 81 s, against 173 s for a full
 integration, and rewrote only the 2024-04 month of the two monthly products. Running it again
-changes nothing.
+changes nothing. `EvaluationReportWeek3.pdf` has the full measurements.
 
 Gold is rebuilt in full when the change feed cannot say what changed: gold records no source
 versions, `conf/integration.yaml` changed, `taxi_zones` changed, a source table was overwritten,
@@ -371,13 +371,13 @@ On Windows the script keeps the machine out of Modern Standby while it runs: a l
 turns off throttles the jobs and reports no error. Other heavy programs running at the same time
 distort the timings in the same way.
 
-The results and their discussion are in `EvaluationReportWeek3.docx`.
+The results and their discussion are in `EvaluationReportWeek3.pdf`.
 
 ## Analytical layer
 
 Twelve Spark SQL queries and four materialised data products read `gold/integrated_taxi_trips`.
-Their design is in `DesignReportWeek2.pdf`, and the optimisation experiments behind them in
-`BenchmarkReportWeek2.pdf`.
+Their design and the optimisation experiments behind them are in the Week 2 design and benchmark
+reports, handed in with Week 2.
 
 ```bash
 python jobs/run_queries.py --list        # the queries
@@ -411,10 +411,8 @@ of its update files and the merge key.
 ## Project layout
 
 ```
-DesignReportWeek3.docx        the Week 3 design report
-EvaluationReportWeek3.docx    the Week 3 evaluation report
-DesignReportWeek2.pdf         the Week 2 design report
-BenchmarkReportWeek2.pdf      the Week 2 benchmark report
+DesignReportWeek3.pdf         the Week 3 design report
+EvaluationReportWeek3.pdf     the Week 3 evaluation report
 README.md                     this file
 conf/
   platform.yaml               Spark settings and the lakehouse root

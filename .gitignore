@@ -1,12 +1,14 @@
-# Local documents, except the two reports this week's assignment asks to hand in.
-# The Week 1 documents stay on disk but are no longer tracked here.
+# Local documents, except the Week 3 reports this assignment hands in. The Week 1 and
+# Week 2 documents stay on disk but are no longer tracked here.
 *.pdf
-!/DesignReportWeek2.pdf
-!/BenchmarkReportWeek2.pdf
-# The Word sources of those two PDFs stay on disk: they cannot be merged, so the PDF
+!/DesignReportWeek3.pdf
+!/EvaluationReportWeek3.pdf
+# The Word sources of those PDFs stay on disk: they cannot be merged, so the PDF
 # is what this repository hands in.
 /DesignReportWeek2.docx
 /BenchmarkReportWeek2.docx
+/DesignReportWeek3.docx
+/EvaluationReportWeek3.docx
 /Assignment-week2.md
 /AssignmentWeek3.md
 
