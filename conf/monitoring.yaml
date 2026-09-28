@@ -153,3 +153,14 @@ queries:
       FROM data_product_metadata
       GROUP BY product_name
       ORDER BY avg_sec DESC
+
+  - name: ml_builds
+    question: Which source version and configuration was each training dataset and feature table built from?
+    requires: [ml_metadata]
+    sql: |
+      SELECT started_at, task, stage, status, source_table, source_version,
+             output_table, output_version, config_fingerprint,
+             rows_train, rows_validation, rows_test,
+             CAST(duration_sec AS DOUBLE) AS duration_sec
+      FROM ml_metadata
+      ORDER BY started_at DESC

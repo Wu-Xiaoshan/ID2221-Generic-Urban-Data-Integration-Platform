@@ -1,0 +1,113 @@
+# jobs/run_ml_dataset.py builds the training dataset from gold (Task 1), and
+# jobs/run_ml_features.py fits the feature pipeline on its training split and writes the model-ready feature table (Task 2).
+
+name: trip_duration
+description: Minutes from pickup to drop-off of a yellow taxi trip, predicted when the trip starts.
+
+# The integrated table: one row per trip, already joined to pickup-hour weather and air quality and to the zone and borough of both endpoints.
+source: {layer: gold, table: integrated_taxi_trips}
+key: trip_id
+
+dataset:
+  label: trip_duration_min
+  filters:
+    located: NOT is_unlocated
+    plausible_duration: trip_duration_min BETWEEN 1 AND 180
+    positive_distance: trip_distance_mi > 0 AND trip_distance_mi <= 100
+    plausible_speed: trip_distance_mi / (trip_duration_min / 60) BETWEEN 1 AND 80
+    not_voided: NOT dq_negative_total
+
+  columns:
+    pickup_ts: taxi_trips
+    trip_distance_mi: taxi_trips
+    passenger_count: taxi_trips
+    vendor_id: taxi_trips
+    ratecode_id: taxi_trips
+    pu_location_id: taxi_trips
+    do_location_id: taxi_trips
+    pickup_borough: taxi_zones
+    dropoff_borough: taxi_zones
+    weather_temp_c: weather
+    weather_humidity_pct: weather
+    weather_precipitation_mm: weather
+    weather_wind_speed_kmh: weather
+    weather_cloud_cover_oktas: weather
+    weather_condition_code: weather
+    weather_is_missing: weather
+    aq_pm25_ugm3: air_quality
+    air_quality_is_missing: air_quality
+
+  split:
+    strategy: chronological
+    column: pickup_date
+    validation_days: 14
+    test_days: 14
+    # strategy: hash assigns each trip by a hash of its key instead, reproducible on any cluster layout (randomSplit is not): strategy: hash fractions: {train: 0.7, validation: 0.15, test: 0.15} seed: 42
+
+  output: trip_duration_dataset
+
+features:
+  generate:
+    - type: temporal
+      column: pickup_ts
+      timezone: America/New_York
+      prefix: pickup
+      parts: [hour_of_day, day_of_week, month, is_weekend, is_holiday, hour_sin, hour_cos]
+      holidays: [2024-01-01, 2024-01-15, 2024-02-19, 2024-05-27, 2024-06-19, 2024-07-04,
+                 2024-09-02, 2024-10-14, 2024-11-11, 2024-11-28, 2024-12-25]
+
+    - type: zone_pair
+      pickup: {zone: pu_location_id, borough: pickup_borough}
+      dropoff: {zone: do_location_id, borough: dropoff_borough}
+      airports: [1, 132, 138]
+    - type: code_groups
+      column: weather_condition_code
+      output: weather_family
+      groups: analytics.weather_families
+    - type: expression
+      columns:
+        is_precipitating: "coalesce(weather_precipitation_mm > 0, weather_family IN ('Rain', 'Snow/Ice'))"
+
+  numeric:
+    trip_distance_mi: {source: taxi_trips, log1p: true}
+    passenger_count: {source: taxi_trips, missing_values: [0]}
+    pickup_hour_sin: {source: taxi_trips}
+    pickup_hour_cos: {source: taxi_trips}
+    weather_temp_c: {source: weather}
+    weather_humidity_pct: {source: weather}
+    weather_precipitation_mm: {source: weather, log1p: true, impute_by: weather_family}
+    weather_wind_speed_kmh: {source: weather}
+    weather_cloud_cover_oktas: {source: weather}
+    aq_pm25_ugm3: {source: air_quality}
+
+  categorical:
+    vendor_id: {source: taxi_trips}
+    ratecode_id: {source: taxi_trips, missing_values: [99]}
+    pickup_hour_of_day: {source: taxi_trips}
+    pickup_day_of_week: {source: taxi_trips}
+    pickup_month: {source: taxi_trips}
+    pu_location_id: {source: taxi_trips}
+    do_location_id: {source: taxi_trips}
+    pickup_borough: {source: taxi_zones}
+    dropoff_borough: {source: taxi_zones}
+    borough_pair: {source: taxi_zones}
+    weather_family: {source: weather}
+
+  binary:
+    pickup_is_weekend: {source: taxi_trips}
+    pickup_is_holiday: {source: taxi_trips}
+    same_borough: {source: taxi_zones}
+    pickup_is_airport: {source: taxi_zones}
+    dropoff_is_airport: {source: taxi_zones}
+    is_precipitating: {source: weather}
+    weather_is_missing: {source: weather}
+    air_quality_is_missing: {source: air_quality}
+
+  impute: median
+  missing_indicators: true
+  encoding: onehot
+  scaling: standard
+
+  keep: [trip_id, pickup_date, split]
+  output: trip_duration_features
+  pipeline: trip_duration_feature_pipeline

@@ -419,6 +419,88 @@ arrived. For a complete month it equals the calendar length, so earlier results 
 Bucket edges, weather families and thresholds are in `conf/analytics.yaml`, and each product's
 grain, schema version and partitioning in `conf/products.yaml`.
 
+## Machine learning
+
+Week 4 builds machine-learning datasets on top of gold. A task is one file in `conf/ml/`: its
+label, which trips qualify, which gold columns it reads, how they are split, and which features
+are built from them. The one that ships, `trip_duration`, predicts a trip's minutes from pickup
+to drop-off from what is known when it starts.
+
+```bash
+python jobs/run_ml_dataset.py                 # Task 1: gold -> ml/trip_duration_dataset
+python jobs/run_ml_features.py                # Task 2: fit the feature pipeline, write ml/trip_duration_features
+python scripts/verify_ml.py                   # leakage, split order, reproducibility, the saved pipeline
+python scripts/analyze_ml_features.py         # which datasets' features carry signal (~10 min)
+python jobs/run_ml_dataset.py --list          # the tasks in conf/ml/
+```
+
+Each step writes a report to `reports/ml/` and a row to `_meta/ml_metadata`, which
+`run_monitoring.py ml_builds` lists.
+
+### The training dataset
+
+`run_ml_dataset.py` reads gold, keeps the trips that pass every filter in the task file, and
+writes one row per trip with `trip_id`, `label`, the declared columns and `split`, partitioned by
+split. For `trip_duration` that is 9,753,369 of gold's 10,220,529 trips. Each filter is counted
+separately in `reports/ml/trip_duration_dataset.md`.
+
+- Columns known only after the trip ends are not carried: fares, tips, tolls, payment type.
+  `fare_amount` is metered from the duration itself.
+- The split is chronological. Validation and test are the last 14 days each, counted back from
+  the newest trip in gold, so after a release they move forward on their own. For v2 that is
+  train 1 January - 10 March, validation 11 - 24 March, test 25 March - 7 April.
+  `validation_start` and `test_start` pin them; `strategy: hash` splits by a hash of the key
+  instead.
+- The dataset records the gold version it was read from and the fingerprint of its
+  configuration, as `ml.*` table properties. `--source-version N` reads gold at an earlier
+  version, and `verify_ml.py` rebuilds the dataset from the recorded version and compares.
+
+### The feature pipeline
+
+`run_ml_features.py` turns the `features` section of the task file into one Spark ML Pipeline,
+fits it on the training split, applies it to all three, and writes
+`ml/trip_duration_features` (`trip_id`, `pickup_date`, `split`, `label` and a 639-slot
+`features` vector) and the fitted PipelineModel under `ml/trip_duration_feature_pipeline`.
+
+| Stage | Does |
+|---|---|
+| generators | one `SQLTransformer` each: `temporal` (local hour, day of week, month, weekend, holiday, hour as sine and cosine), `zone_pair` (same borough, borough pair, airport ends), `code_groups` (Meteostat codes to the weather families of `conf/analytics.yaml`), `expression` |
+| prepare | casts; declared missing codes (`passenger_count` 0, `ratecode_id` 99) to null; `log1p`; null categories to `__missing__` |
+| missing flags | a 0/1 slot for each numeric feature with nulls in training |
+| `GroupImputer` | nulls of a feature with `impute_by`, with the training median of the row's group: precipitation per weather family, since its nulls fall mostly in rain and snow |
+| `Imputer` | the remaining numeric nulls, with the training median |
+| `StandardScaler` | numerics to zero mean and unit variance |
+| `StringIndexer` + `OneHotEncoder` | categories indexed by training frequency; a value first seen later (April, in test) gets an unknown slot instead of failing |
+| `VectorAssembler` | one `features` vector |
+| `SelectColumns` | drops every intermediate and raw column |
+
+Every statistic is learnt from the training split. The saved model carries its SQL, so it
+scores new trips with no labels and nothing from `conf/`:
+
+```python
+from pyspark.ml import PipelineModel
+PipelineModel.load("data/lakehouse/ml/trip_duration_feature_pipeline").transform(trips)
+```
+
+Loading it needs `src/` on the path, for the `SelectColumns` and `GroupImputer` stages.
+`feature_manifest.json` beside the stages names the feature and source dataset of every slot.
+`reports/ml/trip_duration_features.md` lists what was done to each feature, how many values were
+imputed and how many categories were unseen per split.
+
+### Adding a feature, a dataset or a task
+
+- **A feature from a column the dataset has**: one line under `numeric`, `categorical` or `binary`.
+- **A feature from a gold column the dataset lacks**: add it under `dataset.columns` too, and
+  rebuild the dataset.
+- **A derived feature**: an `expression` entry, or a generator for a family of them. A generator
+  is a function registered with `@generator` in `src/urbanplatform/ml/generators.py`.
+- **A new dataset**: integrate it into gold first (`conf/datasets/`, then `context` in
+  `conf/integration.yaml`). From there it is a gold column like any other.
+- **Another prediction task**: a new file in `conf/ml/`, run with the same jobs.
+  `python jobs/run_ml_dataset.py <task>`.
+- **Another encoding**: `encoding: index` and `scaling: none` suit tree models;
+  `analyze_ml_features.py` switches to them for its random forest without a second pipeline.
+
 ## Adding a dataset
 
 Write `conf/datasets/<name>.yaml` declaring the source, expected schema, renames, timestamps, casts
@@ -439,6 +521,7 @@ conf/
   integration.yaml            how the integration joins the four tables
   analytics.yaml              bucket edges, weather families and thresholds for the analytical queries
   products.yaml               the analytical data products: grain, schema version, partitioning
+  ml/*.yaml                   one file per ML task: label, filters, columns, split, features
   monitoring.yaml             the operational questions the platform answers about itself
 src/urbanplatform/            the ingestion framework, the integration pipeline and the analytical layer
   ingest.py                   one pipeline that runs every dataset, for the initial load and for updates
@@ -451,6 +534,7 @@ src/urbanplatform/            the ingestion framework, the integration pipeline 
   integrate.py                builds gold/integrated_taxi_trips and refreshes it from the silver change feeds
   transforms/                 the only dataset-specific code
   analytics/                  the analytical queries, the data products and the benchmark harness
+  ml/                         training datasets, feature generators and the feature pipeline
 jobs/                         one entry point per step (see Scripts)
 scripts/                      the environment check, the update generator and the correctness checks
 docs/common_data_model.md     the common data model, with every column transformation listed
@@ -458,6 +542,7 @@ reports/query_benchmark/      written by run_query_benchmark.py
 reports/updates/              written by generate_updates.py and verify_incremental.py
 reports/monitoring/           written by run_monitoring.py, one file per run
 reports/evaluation/           written by run_evaluation.py: measurements.md and runs.json
+reports/ml/                   written by run_ml_dataset.py, run_ml_features.py and analyze_ml_features.py
 data/raw/                     source files, not included (see Setup)
 data/updates/                 incremental releases, written by generate_updates.py, not included
 data/snapshots/               lakehouse copies run_evaluation.py restores before each run, not included
@@ -466,7 +551,8 @@ data/lakehouse/               created by the jobs
   gold/                       integrated_taxi_trips
   benchmark/                  the two storage variants the Week 1 benchmark compares
   products/                   the analytical data products
-  _meta/                      ingestion_metadata, validation_metrics, quarantine, integration_metadata, data_product_metadata
+  ml/                         training datasets, feature tables and fitted feature pipelines
+  _meta/                      ingestion_metadata, validation_metrics, quarantine, integration_metadata, data_product_metadata, ml_metadata
 ```
 
 ## Scripts
@@ -489,4 +575,8 @@ data/lakehouse/               created by the jobs
 | `jobs/run_benchmark.py` | Week 1: rewrites the fact table two ways and measures both | yes |
 | `jobs/run_query_benchmark.py` | Week 2: runs the query optimisation experiments | yes |
 | `jobs/run_evaluation.py` | Week 3: runs the evaluation experiments from snapshots and measures storage | yes |
+| `jobs/run_ml_dataset.py` | Week 4: builds a task's training dataset from gold | yes |
+| `jobs/run_ml_features.py` | Week 4: fits the feature pipeline and writes the feature table | yes |
+| `scripts/verify_ml.py` | checks the training dataset and feature table: leakage, splits, reproducibility | yes |
+| `scripts/analyze_ml_features.py` | ablation and importance of each dataset's features | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |

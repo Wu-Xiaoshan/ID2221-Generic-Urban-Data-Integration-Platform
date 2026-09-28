@@ -21,6 +21,7 @@ META_TABLES = {
     "quarantine": "quarantine",
     "integration_metadata": "integration_metadata",
     "data_product_metadata": "data_product_metadata",
+    "ml_metadata": "ml_metadata",
 }
 
 # Columns the run tables gained after Week 1. A table whose last write predates them
@@ -106,6 +107,24 @@ _PIPELINE_RUN_PARTS = {
                schema_version,
                CAST(NULL AS STRING) AS release
         FROM data_product_metadata
+    """,
+    # Week 4. Both ML steps rebuild their table in full; the configuration fingerprint takes
+    # the place of a schema version.
+    "ml_metadata": """
+        SELECT run_id,
+               CONCAT('ml_', stage) AS pipeline,
+               'full' AS mode,
+               output_table AS entity,
+               status,
+               started_at,
+               finished_at,
+               CAST(duration_sec AS DOUBLE) AS duration_sec,
+               rows_in AS records_read,
+               rows_train + rows_validation + rows_test AS records_written,
+               CAST(NULL AS BIGINT) AS records_rejected,
+               config_fingerprint AS schema_version,
+               CAST(NULL AS STRING) AS release
+        FROM ml_metadata
     """,
 }
 
