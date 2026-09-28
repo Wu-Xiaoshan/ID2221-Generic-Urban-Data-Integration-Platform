@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import os
 import sys
 import time
@@ -35,7 +34,7 @@ def estimator(name: str):
 
 
 def spec_for(model: str, spec: FeaturesSpec) -> FeaturesSpec:
-    return dataclasses.replace(spec, encoding="index", scaling="none") if model == "rf" else spec
+    return spec.with_settings(encoding="index", scaling="none") if model == "rf" else spec
 
 
 def evaluate(pred: DataFrame) -> dict[str, float]:
@@ -49,6 +48,7 @@ def main() -> int:
     parser.add_argument("--train-frac", type=float, default=0.05, help="share of the train split used")
     parser.add_argument("--val-frac", type=float, default=0.10, help="share of the validation split used")
     parser.add_argument("--models", default="lr,rf", help="comma-separated: lr, rf")
+    parser.add_argument("--report", help="file name under reports/ml/ (default: <task>_feature_analysis.md)")
     args = parser.parse_args()
 
     platform = PlatformConfig.load()
@@ -133,7 +133,7 @@ def main() -> int:
         ]
     lines.append("")
 
-    report = os.path.join(REPO_ROOT, "reports", "ml", f"{task.name}_feature_analysis.md")
+    report = os.path.join(REPO_ROOT, "reports", "ml", args.report or f"{task.name}_feature_analysis.md")
     os.makedirs(os.path.dirname(report), exist_ok=True)
     with open(report, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))

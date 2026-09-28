@@ -152,13 +152,53 @@ class FeaturesSpec:
             output=raw["output"],
             pipeline=raw["pipeline"],
         )
+        spec._check_settings()
+        return spec
+
+    def with_settings(self, **settings: Any) -> FeaturesSpec:
+        """The same features with other pipeline settings, e.g. ``encoding="index"``."""
+        spec = replace(self, **settings)
+        spec._check_settings()
+        return spec
+
+    def _check_settings(self) -> None:
         for setting, value, allowed in (
-            ("impute", spec.impute, ("median", "mean")),
-            ("encoding", spec.encoding, ("onehot", "index")),
-            ("scaling", spec.scaling, ("standard", "minmax", "none")),
+            ("impute", self.impute, ("median", "mean")),
+            ("encoding", self.encoding, ("onehot", "index")),
+            ("scaling", self.scaling, ("standard", "minmax", "none")),
         ):
             if value not in allowed:
                 raise ValueError(f"features.{setting}: '{value}' is not one of {' / '.join(allowed)}")
+
+
+# Feature settings a model may change for itself, e.g. `encoding: index` for a tree model.
+FEATURE_OVERRIDES = ("impute", "missing_indicators", "encoding", "scaling")
+
+
+@dataclass(frozen=True)
+class ModelSpec:
+    type: str
+    params: dict[str, Any]
+    metrics: list[str]
+    output: str
+    # Error is also reported per value of this dataset column, on the test split.
+    breakdown: str | None = None
+    features: dict[str, Any] = field(default_factory=dict)
+
+    @staticmethod
+    def parse(raw: dict[str, Any]) -> ModelSpec:
+        spec = ModelSpec(
+            type=raw["type"],
+            params=dict(raw.get("params") or {}),
+            metrics=list(raw.get("metrics") or ["rmse", "mae", "r2"]),
+            output=raw["output"],
+            breakdown=raw.get("breakdown"),
+            features=dict(raw.get("features") or {}),
+        )
+        unknown = [k for k in spec.features if k not in FEATURE_OVERRIDES]
+        if unknown:
+            raise ValueError(f"model.features: only {', '.join(FEATURE_OVERRIDES)} can be overridden, "
+                             f"not {', '.join(unknown)}")
         return spec
 
 
@@ -171,6 +211,7 @@ class MLTaskConfig:
     key: str
     dataset: DatasetSpec
     features: FeaturesSpec
+    model: ModelSpec | None = None
 
     @staticmethod
     def load(name: str) -> MLTaskConfig:
@@ -192,7 +233,14 @@ class MLTaskConfig:
                 output=ds["output"],
             ),
             features=FeaturesSpec.parse(raw["features"]),
+            model=ModelSpec.parse(raw["model"]) if raw.get("model") else None,
         )
+
+    @property
+    def model_features(self) -> FeaturesSpec:
+        """The feature pipeline the model is trained with: `features` plus the model's overrides."""
+        overrides = self.model.features if self.model else {}
+        return self.features.with_settings(**overrides) if overrides else self.features
 
     @property
     def dataset_fingerprint(self) -> str:
@@ -205,6 +253,14 @@ class MLTaskConfig:
     @property
     def features_fingerprint(self) -> str:
         return _fingerprint(dataclasses.asdict(self.features))
+
+    @property
+    def model_fingerprint(self) -> str:
+        """A hash of the features as the model sees them and of the whole `model` section."""
+        if self.model is None:
+            raise ValueError(f"[{self.name}] has no `model` section")
+        return _fingerprint({"features": dataclasses.asdict(self.model_features),
+                             "model": dataclasses.asdict(self.model)})
 
 
 def _fingerprint(definition: dict[str, Any]) -> str:

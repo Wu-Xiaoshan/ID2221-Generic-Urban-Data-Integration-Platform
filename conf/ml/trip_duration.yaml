@@ -111,3 +111,14 @@ features:
   keep: [trip_id, pickup_date, split]
   output: trip_duration_features
   pipeline: trip_duration_feature_pipeline
+
+# jobs/run_ml_train.py fits the feature pipeline above and this estimator as one Spark ML Pipeline
+# on the training split, evaluates it on validation and test, and saves it as the next version
+# under ml/models/<output>/ (Task 3).
+model:
+  type: linear_regression          # a function registered with @estimator in src/urbanplatform/ml/model.py
+  params: {regParam: 0.01, elasticNetParam: 0.0}
+  metrics: [rmse, mae, r2]         # the first one is the headline
+  breakdown: pickup_borough        # test error per value of this dataset column
+  output: trip_duration_model
+  # features: {encoding: index, scaling: none}   what a tree model would override

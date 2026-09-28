@@ -164,3 +164,18 @@ queries:
              CAST(duration_sec AS DOUBLE) AS duration_sec
       FROM ml_metadata
       ORDER BY started_at DESC
+
+  - name: ml_models
+    question: Which data was each model version trained on, and did retraining improve it on the newest test split?
+    requires: [ml_metadata]
+    sql: |
+      SELECT started_at, task, output_version AS model_version, source_version AS dataset_version,
+             CAST(get_json_object(details, '$.gold_version') AS BIGINT) AS gold_version,
+             rows_train,
+             ROUND(CAST(get_json_object(details, '$.metrics.validation.rmse') AS DOUBLE), 3) AS validation_rmse,
+             ROUND(CAST(get_json_object(details, '$.metrics.test.rmse') AS DOUBLE), 3) AS test_rmse,
+             ROUND(CAST(get_json_object(details, '$.previous_test.rmse') AS DOUBLE), 3) AS previous_on_test_rmse,
+             config_fingerprint
+      FROM ml_metadata
+      WHERE stage = 'train' AND status = 'success'
+      ORDER BY started_at DESC
