@@ -252,8 +252,6 @@ version 1 has an RMSE of 6.61 minutes and version 2 6.59; predicting the trainin
 ## Project layout
 
 ```
-DesignReportWeek3.pdf         the Week 3 design report
-EvaluationReportWeek3.pdf     the Week 3 evaluation report
 DesignReportWeek4.docx        the Week 4 design report
 EvaluationReportWeek4.docx    the Week 4 evaluation report
 README.md                     this file
