@@ -1,10 +1,10 @@
 # Feature pipeline: trip_duration
 
 - input: `ml/trip_duration_dataset` version 5
-- output: `ml/trip_duration_features` version 3, 9,753,369 rows, one `features` vector of 639 slots each
+- output: `ml/trip_duration_features` version 1, 9,753,369 rows, one `features` vector of 639 slots each
 - fitted pipeline: `ml/trip_duration_feature_pipeline` (14 stages)
 - configuration fingerprint: `cf45e97e28b7`
-- fit on train 79.3 s, transform and write 233.0 s, run 352.7 s (run `c6e3cff7-6aae-4c0b-a687-f928bfe9f1ed`)
+- fit on train 71.8 s, transform and write 189.3 s, run 288.2 s (run `33430893-2b9e-447b-b2b8-379f050de243`)
 
 ## Stages
 

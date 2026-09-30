@@ -2,11 +2,11 @@
 
 Minutes from pickup to drop-off of a yellow taxi trip, predicted when the trip starts.
 
-- source: `gold/integrated_taxi_trips` version 16
+- source: `gold/integrated_taxi_trips` version 7
 - output: `ml/trip_duration_dataset` version 5
 - configuration fingerprint: `c3979729f2a1`
 - label: `trip_duration_min`
-- built 2026-09-28 20:26 UTC in 109.9 s (run `585f44c2-7329-43f6-8cb7-78e413c073bb`)
+- built 2026-09-30 15:33 UTC in 81.1 s (run `be541ec1-8b28-480b-8cb3-bced752095f2`)
 
 ## Filters
 

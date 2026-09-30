@@ -12,8 +12,8 @@ mean (15.21 min) gives RMSE 12.877, MAE 8.719.
 
 | model | features from | features | slots | RMSE | MAE | R² | RMSE change vs all | time |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| lr | all datasets | 29 | 639 | 6.158 | 3.977 | 0.7702 | - | 482 s |
-| lr | without weather | 21 | 625 | 6.159 | 3.969 | 0.7701 | +0.001 | 188 s |
-| lr | without air_quality | 27 | 637 | 6.156 | 3.963 | 0.7703 | -0.002 | 448 s |
-| lr | without taxi_zones | 23 | 588 | 6.212 | 3.999 | 0.7661 | +0.054 | 289 s |
-| lr | taxi_trips only | 13 | 572 | 6.214 | 3.988 | 0.7660 | +0.056 | 144 s |
+| lr | all datasets | 29 | 639 | 6.158 | 3.977 | 0.7702 | - | 361 s |
+| lr | without weather | 21 | 625 | 6.159 | 3.969 | 0.7701 | +0.001 | 142 s |
+| lr | without air_quality | 27 | 637 | 6.156 | 3.963 | 0.7703 | -0.002 | 342 s |
+| lr | without taxi_zones | 23 | 588 | 6.212 | 3.999 | 0.7661 | +0.054 | 231 s |
+| lr | taxi_trips only | 13 | 572 | 6.214 | 3.988 | 0.7660 | +0.056 | 107 s |

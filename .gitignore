@@ -15,6 +15,8 @@
 /data/updates/
 /data/lakehouse/
 /data/snapshots/
+/data/approach_a/
+/data/approach_b/
 
 # Python
 __pycache__/

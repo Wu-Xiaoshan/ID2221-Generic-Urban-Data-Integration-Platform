@@ -3,10 +3,10 @@
 Minutes from pickup to drop-off of a yellow taxi trip, predicted when the trip starts.
 
 - model: `linear_regression` (regParam=0.01, elasticNetParam=0.0), version 2 of `ml/models/trip_duration_model`
-- lineage: `gold/integrated_taxi_trips` v16 -> `ml/trip_duration_dataset` v5 -> `ml/models/trip_duration_model/v2`
+- lineage: `gold/integrated_taxi_trips` v7 -> `ml/trip_duration_dataset` v5 -> `ml/models/trip_duration_model/v2`
 - pipeline: 15 stages (14 from the feature pipeline, then `LinearRegressionModel`), 639 feature slots, saved at `ml/models/trip_duration_model/v2/pipeline`
 - configuration fingerprint: `cb40964b99ce`
-- fit on train 422.9 s, scoring and evaluation 427.6 s, run 867.6 s (run `a49dbf48-4525-4b02-8b1f-0e8d12d777f8`)
+- fit on train 352.0 s, scoring and evaluation 316.5 s, run 680.1 s (run `cc0585fc-73c5-4cfa-b5c1-aa70be5a8df5`)
 
 ## Evaluation
 
@@ -24,11 +24,11 @@ The mean baseline predicts the training mean, 15.21 min, for every trip.
 
 ## Against the previous version
 
-Version 1, trained on `ml/trip_duration_dataset` v3 (gold v5), scored on this version's test split:
+Version 1, trained on `ml/trip_duration_dataset` v3 (gold v3), scored on this version's test split:
 
 | version | RMSE | MAE | R² |
 |---|---:|---:|---:|
-| v1 (previous) | 6.612 | 4.149 | 0.7448 |
+| v1 (previous) | 6.609 | 4.136 | 0.7450 |
 | v2 (this run) | 6.586 | 4.150 | 0.7468 |
 
 ## Test error by `pickup_borough`
@@ -95,5 +95,5 @@ compared in the section above instead.
 
 | version | trained (UTC) | gold version | dataset version | train rows | test from | validation RMSE | test RMSE | fingerprint |
 |---:|---|---:|---:|---:|---|---:|---:|---|
-| v1 | 2026-09-28 20:12 | 5 | 3 | 6,019,175 | 2024-03-18 | 6.166 | 6.287 | `cb40964b99ce` |
-| v2 | 2026-09-28 20:28 | 16 | 5 | 6,797,379 | 2024-03-25 | 6.158 | 6.586 | `cb40964b99ce` |
+| v1 | 2026-09-30 15:25 | 3 | 3 | 6,109,158 | 2024-03-19 | 6.189 | 6.286 | `cb40964b99ce` |
+| v2 | 2026-09-30 15:35 | 7 | 5 | 6,797,379 | 2024-03-25 | 6.158 | 6.586 | `cb40964b99ce` |

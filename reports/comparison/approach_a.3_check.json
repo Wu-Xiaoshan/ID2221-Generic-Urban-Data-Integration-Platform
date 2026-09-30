@@ -1,0 +1,52 @@
+[
+ {
+  "pass": true,
+  "check": "split boundaries",
+  "detail": "A {'newest': '2024-04-07', 'validation_start': '2024-03-11', 'test_start': '2024-03-25'}, platform {'newest': '2024-04-07', 'strategy': 'chronological', 'test_start': '2024-03-25', 'validation_start': '2024-03-11'}"
+ },
+ {
+  "pass": true,
+  "check": "rows per split",
+  "detail": "A {'train': 6797379, 'validation': 1551915, 'test': 1404075}, platform {'train': 6797379, 'validation': 1551915, 'test': 1404075}"
+ },
+ {
+  "pass": true,
+  "check": "same trips",
+  "detail": "0 only in A, 0 only in the platform"
+ },
+ {
+  "pass": true,
+  "check": "same columns",
+  "detail": "missing in A: none"
+ },
+ {
+  "pass": true,
+  "check": "every column row by row",
+  "detail": "21 columns, differing rows: none"
+ },
+ {
+  "pass": true,
+  "check": "missing-value flags",
+  "detail": "A ['passenger_count', 'weather_precipitation_mm'], platform ['passenger_count', 'weather_precipitation_mm']"
+ },
+ {
+  "pass": true,
+  "check": "vector size",
+  "detail": "A 639, platform 639"
+ },
+ {
+  "pass": true,
+  "check": "validation metrics",
+  "detail": "A rmse 6.157985 mae 3.977132 r2 0.770171; platform rmse 6.157985 mae 3.977132 r2 0.770171; largest gap 6.1e-12"
+ },
+ {
+  "pass": true,
+  "check": "test metrics",
+  "detail": "A rmse 6.585502 mae 4.150034 r2 0.746802; platform rmse 6.585502 mae 4.150034 r2 0.746802; largest gap 1.2e-11"
+ },
+ {
+  "pass": true,
+  "check": "predictions on the test split",
+  "detail": "1,404,075 trips, largest difference 3.75e-08 min, mean 1.41e-10 min"
+ }
+]

@@ -1,0 +1,47 @@
+[
+ {
+  "pass": true,
+  "check": "rows per split",
+  "detail": "A {'train': 6109158, 'validation': 1565580, 'test': 1435332}, platform {'train': 6109158, 'validation': 1565580, 'test': 1435332}"
+ },
+ {
+  "pass": true,
+  "check": "same trips",
+  "detail": "0 only in A, 0 only in the platform"
+ },
+ {
+  "pass": true,
+  "check": "same columns",
+  "detail": "missing in A: none"
+ },
+ {
+  "pass": true,
+  "check": "every column row by row",
+  "detail": "21 columns, differing rows: none"
+ },
+ {
+  "pass": true,
+  "check": "missing-value flags",
+  "detail": "A ['passenger_count', 'weather_precipitation_mm'], platform ['passenger_count', 'weather_precipitation_mm']"
+ },
+ {
+  "pass": true,
+  "check": "vector size",
+  "detail": "A 639, platform 639"
+ },
+ {
+  "pass": true,
+  "check": "validation metrics",
+  "detail": "A rmse 6.188577 mae 3.937909 r2 0.768357; platform rmse 6.188577 mae 3.937909 r2 0.768357; largest gap 6.0e-12"
+ },
+ {
+  "pass": true,
+  "check": "test metrics",
+  "detail": "A rmse 6.285503 mae 4.036242 r2 0.759855; platform rmse 6.285503 mae 4.036242 r2 0.759855; largest gap 7.6e-12"
+ },
+ {
+  "pass": true,
+  "check": "predictions on the test split",
+  "detail": "1,435,332 trips, largest difference 3.18e-08 min, mean 1.21e-10 min"
+ }
+]

@@ -128,7 +128,7 @@ python jobs/run_ml_train.py                   # Task 3: train, evaluate and save
 python scripts/verify_ml_model.py             # lineage, reloading, a deterministic refit, no test data in the fit
 python scripts/analyze_ml_features.py         # which datasets' features carry signal, on a sample (~10 min)
 python scripts/analyze_ml_features.py --models lr --train-frac 1.0 --val-frac 1.0 \
-       --report trip_duration_feature_analysis_full_lr.md   # the same for the linear model on all data (~30 min)
+       --report trip_duration_feature_analysis_full_lr.md   # the same for the linear model on all data (~20 min)
 python jobs/run_ml_dataset.py --list          # the tasks in conf/ml/
 ```
 
@@ -219,15 +219,15 @@ gold up to date:
 
 ```bash
 python jobs/run_ml_train.py --rebuild             # dataset from the newest gold, then the next version
-python jobs/run_ml_train.py --rebuild --source-version 5   # or from gold as it was at version 5
+python jobs/run_ml_train.py --rebuild --source-version 3   # or from gold as it was at version 3
 ```
 
 The split windows move forward with the new data. Earlier versions stay where they are, and the
 report scores the previous version on the new test split next to the new one. The model does not
 read the Task 2 feature table, so `run_ml_features.py` is only needed afterwards to bring that
 table level with the new dataset, which `verify_ml.py` checks. For release v2,
-version 1 was trained with `--rebuild --source-version 5` on gold before the release (test from
-18 March) and version 2 with `--rebuild` after it (test from 25 March). On version 2's test split,
+version 1 was trained with `--rebuild --source-version 3` on gold before the release (test from
+19 March) and version 2 with `--rebuild` after it (test from 25 March). On version 2's test split,
 version 1 has an RMSE of 6.61 minutes and version 2 6.59; predicting the training mean gives 13.14.
 
 ### Adding a feature, a dataset or a task
@@ -248,6 +248,34 @@ version 1 has an RMSE of 6.61 minutes and version 2 6.59; predicting the trainin
 - `encoding: index` and `scaling: none` suit tree models. A model sets them for itself under
   `model.features`, and `analyze_ml_features.py` switches to them for its random forest, so
   neither needs a second pipeline.
+
+### Comparing with a pipeline built from the raw files
+
+Week 4 Task 4 builds the same model without the platform. `scripts/approach_a_from_raw.py` reads
+the raw files and the release v2 taxi file, and does the cleaning, the joins, the filters, the
+split, the feature stages and the regression itself, using no code from `src/urbanplatform` and
+no file from `conf/`. Every rule in it copies one the platform already applies.
+
+```bash
+python scripts/approach_a_from_raw.py             # raw files -> data/approach_a/, reports/comparison/approach_a.json
+python scripts/compare_approaches.py              # the same trips, columns, metrics and predictions as the platform
+python scripts/run_comparison.py                  # the timings in the evaluation report (about 2.5 hours)
+```
+
+`compare_approaches.py` needs the platform's dataset and model first (`run_ml_train.py`). With
+`--without-update`, A leaves out release v2, and `compare_approaches.py --dataset-version N
+--model-version 1 --report reports/comparison/approach_a_without_update.json` compares it with
+the model trained before the release, where N is the dataset version in that model's
+`model.json` (3 after the commands above).
+
+`run_comparison.py` runs A and the platform three times each, interleaved, after a discarded
+warm-up of A. The platform runs in its own lakehouse under `data/approach_b/`, rebuilt from
+nothing each time (`run_ingest.py`, `run_update.py v2`, `run_integrate.py`,
+`run_ml_train.py --rebuild`), so `data/lakehouse` is left alone and `reports/ml/` is restored
+afterwards. It then runs both comparisons, and times the ML job three more times with Delta's
+optimizeWrite and autoCompact switched off, which writes the training split as four files instead
+of one. The results are in `reports/comparison/timings.md`; `--resume` continues an interrupted
+run.
 
 ## Project layout
 
@@ -283,9 +311,12 @@ reports/updates/              written by generate_updates.py and verify_incremen
 reports/monitoring/           written by run_monitoring.py, one file per run
 reports/evaluation/           written by run_evaluation.py: measurements.md and runs.json
 reports/ml/                   written by run_ml_dataset.py, run_ml_features.py, run_ml_train.py and analyze_ml_features.py
+reports/comparison/           written by approach_a_from_raw.py, compare_approaches.py and run_comparison.py
 data/raw/                     source files, not included (see Setup)
 data/updates/                 incremental releases, written by generate_updates.py, not included
 data/snapshots/               lakehouse copies run_evaluation.py restores before each run, not included
+data/approach_a/              the dataset, model and logs of approach_a_from_raw.py and run_comparison.py, not included
+data/approach_b/              the platform's own lakehouse during run_comparison.py, not included
 data/lakehouse/               created by the jobs
   silver/                     one Delta table per dataset
   gold/                       integrated_taxi_trips
@@ -322,4 +353,7 @@ data/lakehouse/               created by the jobs
 | `scripts/verify_ml.py` | checks the training dataset and feature table: leakage, splits, reproducibility | yes |
 | `scripts/verify_ml_model.py` | checks the saved models: lineage, reloading, a deterministic refit, no test data in the fit | yes |
 | `scripts/analyze_ml_features.py` | ablation and importance of each dataset's features | yes |
+| `scripts/approach_a_from_raw.py` | Week 4 Task 4: the same model built from the raw files without the platform | yes |
+| `scripts/compare_approaches.py` | checks that model and its dataset against the platform's, row by row | yes |
+| `scripts/run_comparison.py` | times both approaches and runs the checks | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |

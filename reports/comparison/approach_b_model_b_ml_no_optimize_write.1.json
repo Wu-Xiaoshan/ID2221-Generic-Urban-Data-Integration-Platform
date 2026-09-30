@@ -1,0 +1,427 @@
+{
+ "task": "trip_duration",
+ "version": 1,
+ "run_id": "16cc5587-3691-4d99-95ac-982756905152",
+ "trained_at": "2026-09-30T20:10:39+00:00",
+ "task_type": "regression",
+ "model": {
+  "type": "linear_regression",
+  "params": {
+   "regParam": 0.01,
+   "elasticNetParam": 0.0
+  },
+  "metrics": [
+   "rmse",
+   "mae",
+   "r2"
+  ],
+  "output": "trip_duration_model",
+  "breakdown": "pickup_borough",
+  "features": {}
+ },
+ "model_fingerprint": "cb40964b99ce",
+ "dataset": {
+  "table": "ml/trip_duration_dataset",
+  "version": 1,
+  "source_table": "gold/integrated_taxi_trips",
+  "source_version": 3,
+  "config_fingerprint": "c3979729f2a1",
+  "split": {
+   "newest": "2024-04-07",
+   "strategy": "chronological",
+   "test_start": "2024-03-25",
+   "validation_start": "2024-03-11"
+  }
+ },
+ "rows": {
+  "train": 6797379,
+  "validation": 1551915,
+  "test": 1404075
+ },
+ "vector_size": 639,
+ "missing_indicators": [
+  "passenger_count",
+  "weather_precipitation_mm"
+ ],
+ "stages": [
+  "SQLTransformer",
+  "SQLTransformer",
+  "SQLTransformer",
+  "SQLTransformer",
+  "SQLTransformer",
+  "SQLTransformer",
+  "GroupImputerModel",
+  "ImputerModel",
+  "VectorAssembler",
+  "StandardScalerModel",
+  "StringIndexerModel",
+  "OneHotEncoderModel",
+  "VectorAssembler",
+  "SelectColumns",
+  "LinearRegressionModel"
+ ],
+ "metrics": {
+  "train": {
+   "rmse": 5.663978509464037,
+   "mae": 3.6550983536596067,
+   "r2": 0.7740003293496799
+  },
+  "validation": {
+   "rmse": 6.157984658748128,
+   "mae": 3.977131881721654,
+   "r2": 0.7701708527107156
+  },
+  "test": {
+   "rmse": 6.585501812427613,
+   "mae": 4.150034081599027,
+   "r2": 0.7468022953966824
+  }
+ },
+ "baseline": {
+  "prediction": 15.205815829895599,
+  "validation": {
+   "rmse": 12.877223194773874,
+   "mae": 8.718960843216072,
+   "r2": -0.005014544457766057
+  },
+  "test": {
+   "rmse": 13.138793451365425,
+   "mae": 8.814623103452139,
+   "r2": -0.007843241213754348
+  }
+ },
+ "breakdown": {
+  "column": "pickup_borough",
+  "rows": [
+   {
+    "pickup_borough": "Manhattan",
+    "rows": 1263056,
+    "label_mean": 14.204776787411348,
+    "rmse": 5.482733773455374,
+    "mae": 3.637887212532756
+   },
+   {
+    "pickup_borough": "Queens",
+    "rows": 118492,
+    "label_mean": 36.527899351854806,
+    "rmse": 12.322476287582909,
+    "mae": 8.518039980244039
+   },
+   {
+    "pickup_borough": "Brooklyn",
+    "rows": 17950,
+    "label_mean": 30.624257195914762,
+    "rmse": 14.467040758426641,
+    "mae": 9.653534711248568
+   },
+   {
+    "pickup_borough": "Bronx",
+    "rows": 4533,
+    "label_mean": 34.6409736010001,
+    "rmse": 16.08583029267171,
+    "mae": 10.858008275015546
+   },
+   {
+    "pickup_borough": "Staten Island",
+    "rows": 40,
+    "label_mean": 25.363749999999996,
+    "rmse": 8.73982076961521,
+    "mae": 6.781752334421791
+   },
+   {
+    "pickup_borough": "EWR",
+    "rows": 4,
+    "label_mean": 19.0875,
+    "rmse": 4.943799144135948,
+    "mae": 3.1672496138389006
+   }
+  ]
+ },
+ "previous": null,
+ "weights": {
+  "kind": "coefficient",
+  "intercept": 18.825080036718283,
+  "nonzero": 626,
+  "single": [
+   {
+    "feature": "trip_distance_mi",
+    "source": "taxi_trips",
+    "detail": "numeric",
+    "weight": 10.101416091413821
+   },
+   {
+    "feature": "passenger_count (missing flag)",
+    "source": "taxi_trips",
+    "detail": "missing flag",
+    "weight": -5.957890273661988
+   },
+   {
+    "feature": "pickup_hour_cos",
+    "source": "taxi_trips",
+    "detail": "numeric",
+    "weight": -1.927551177351554
+   },
+   {
+    "feature": "pickup_is_holiday",
+    "source": "taxi_trips",
+    "detail": "binary",
+    "weight": -1.8250154125330647
+   },
+   {
+    "feature": "dropoff_is_airport",
+    "source": "taxi_zones",
+    "detail": "binary",
+    "weight": -1.4615725938107642
+   },
+   {
+    "feature": "pickup_is_airport",
+    "source": "taxi_zones",
+    "detail": "binary",
+    "weight": -1.0599937360180087
+   },
+   {
+    "feature": "pickup_hour_sin",
+    "source": "taxi_trips",
+    "detail": "numeric",
+    "weight": -0.9575716973142532
+   },
+   {
+    "feature": "same_borough",
+    "source": "taxi_zones",
+    "detail": "binary",
+    "weight": -0.7052747588736624
+   },
+   {
+    "feature": "pickup_is_weekend",
+    "source": "taxi_trips",
+    "detail": "binary",
+    "weight": -0.7051824463875593
+   },
+   {
+    "feature": "is_precipitating",
+    "source": "weather",
+    "detail": "binary",
+    "weight": 0.5792926834574721
+   },
+   {
+    "feature": "weather_humidity_pct",
+    "source": "weather",
+    "detail": "numeric",
+    "weight": -0.36365163787231847
+   },
+   {
+    "feature": "weather_cloud_cover_oktas",
+    "source": "weather",
+    "detail": "numeric",
+    "weight": 0.24518400016339748
+   },
+   {
+    "feature": "weather_precipitation_mm (missing flag)",
+    "source": "weather",
+    "detail": "missing flag",
+    "weight": -0.23301193355762997
+   },
+   {
+    "feature": "aq_pm25_ugm3",
+    "source": "air_quality",
+    "detail": "numeric",
+    "weight": 0.11164911575830279
+   },
+   {
+    "feature": "passenger_count",
+    "source": "taxi_trips",
+    "detail": "numeric",
+    "weight": 0.09096109480769438
+   },
+   {
+    "feature": "weather_temp_c",
+    "source": "weather",
+    "detail": "numeric",
+    "weight": -0.05821688599293439
+   },
+   {
+    "feature": "weather_precipitation_mm",
+    "source": "weather",
+    "detail": "numeric",
+    "weight": 0.0490110448893575
+   },
+   {
+    "feature": "weather_wind_speed_kmh",
+    "source": "weather",
+    "detail": "numeric",
+    "weight": -0.04591802584315587
+   },
+   {
+    "feature": "weather_is_missing",
+    "source": "weather",
+    "detail": "binary",
+    "weight": 0.0
+   },
+   {
+    "feature": "air_quality_is_missing",
+    "source": "air_quality",
+    "detail": "binary",
+    "weight": 0.0
+   }
+  ],
+  "grouped": [
+   {
+    "feature": "pu_location_id",
+    "source": "taxi_trips",
+    "slots": 257,
+    "low": [
+     "= 204",
+     -20.84612816624368
+    ],
+    "high": [
+     "= 117",
+     22.01185923297861
+    ],
+    "total": 950.9964776448013
+   },
+   {
+    "feature": "do_location_id",
+    "source": "taxi_trips",
+    "slots": 260,
+    "low": [
+     "= 154",
+     -15.537872851918715
+    ],
+    "high": [
+     "= 109",
+     9.844322604304349
+    ],
+    "total": 483.21802761836483
+   },
+   {
+    "feature": "borough_pair",
+    "source": "taxi_zones",
+    "slots": 34,
+    "low": [
+     "= Staten Island -> Brooklyn",
+     -5.853345022497808
+    ],
+    "high": [
+     "= Brooklyn -> Bronx",
+     18.73115809964765
+    ],
+    "total": 126.31972314164089
+   },
+   {
+    "feature": "ratecode_id",
+    "source": "taxi_trips",
+    "slots": 8,
+    "low": [
+     "= 3",
+     -4.111832425690071
+    ],
+    "high": [
+     "= __missing__",
+     4.007697573098574
+    ],
+    "total": 21.100706271817604
+   },
+   {
+    "feature": "pickup_hour_of_day",
+    "source": "taxi_trips",
+    "slots": 25,
+    "low": [
+     "= 5",
+     -3.6616785628382638
+    ],
+    "high": [
+     "= 1",
+     0.9918407093810544
+    ],
+    "total": 17.427404736332498
+   },
+   {
+    "feature": "pickup_borough",
+    "source": "taxi_zones",
+    "slots": 7,
+    "low": [
+     "= Staten Island",
+     -0.9781782575605202
+    ],
+    "high": [
+     "= Bronx",
+     2.06692106506734
+    ],
+    "total": 6.432968535796553
+   },
+   {
+    "feature": "pickup_day_of_week",
+    "source": "taxi_trips",
+    "slots": 8,
+    "low": [
+     "= 1",
+     -1.4756386909500843
+    ],
+    "high": [
+     "= 5",
+     0.6392835977902883
+    ],
+    "total": 3.794997429005207
+   },
+   {
+    "feature": "dropoff_borough",
+    "source": "taxi_zones",
+    "slots": 7,
+    "low": [
+     "= EWR",
+     -1.0310270486000082
+    ],
+    "high": [
+     "= Brooklyn",
+     0.47685395459421814
+    ],
+    "total": 3.0535316244545956
+   },
+   {
+    "feature": "weather_family",
+    "source": "weather",
+    "slots": 6,
+    "low": [
+     "= Snow/Ice",
+     -0.422383209639862
+    ],
+    "high": [
+     "= Fog",
+     0.6982748809924582
+    ],
+    "total": 1.6956523148235263
+   },
+   {
+    "feature": "vendor_id",
+    "source": "taxi_trips",
+    "slots": 3,
+    "low": [
+     "= 2",
+     -0.5297730522073428
+    ],
+    "high": [
+     "= 1",
+     0.5297730518029038
+    ],
+    "total": 1.0595461040102467
+   },
+   {
+    "feature": "pickup_month",
+    "source": "taxi_trips",
+    "slots": 4,
+    "low": [
+     "= 1",
+     -0.37377313027918807
+    ],
+    "high": [
+     "= 3",
+     0.5286900912525625
+    ],
+    "total": 0.9816921274222585
+   }
+  ]
+ },
+ "fit_sec": 220.3,
+ "evaluate_sec": 114.3,
+ "pipeline_path": "ml/models/trip_duration_model/v1/pipeline"
+}
