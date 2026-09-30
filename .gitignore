@@ -1,5 +1,7 @@
 # Documents
 *.pdf
+!/DesignReportWeek4.pdf
+!/EvaluationReportWeek4.pdf
 /DesignReportWeek2.docx
 /BenchmarkReportWeek2.docx
 /DesignReportWeek3.docx

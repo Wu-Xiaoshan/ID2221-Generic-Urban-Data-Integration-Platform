@@ -219,15 +219,17 @@ gold up to date:
 
 ```bash
 python jobs/run_ml_train.py --rebuild             # dataset from the newest gold, then the next version
-python jobs/run_ml_train.py --rebuild --source-version 3   # or from gold as it was at version 3
+python jobs/run_ml_train.py --rebuild --source-version N   # or from gold as it was at version N
 ```
 
 The split windows move forward with the new data. Earlier versions stay where they are, and the
 report scores the previous version on the new test split next to the new one. The model does not
 read the Task 2 feature table, so `run_ml_features.py` is only needed afterwards to bring that
 table level with the new dataset, which `verify_ml.py` checks. For release v2,
-version 1 was trained with `--rebuild --source-version 3` on gold before the release (test from
-19 March) and version 2 with `--rebuild` after it (test from 25 March). On version 2's test split,
+version 1 was trained with `--rebuild --source-version N`, where N is gold's last version before
+`run_refresh.py` applied the release (3 for us; `DESCRIBE HISTORY` on the gold table shows it),
+with its test split from 19 March. Version 2 was trained with `--rebuild` after the release, with
+its test split from 25 March. On version 2's test split,
 version 1 has an RMSE of 6.61 minutes and version 2 6.59; predicting the training mean gives 13.14.
 
 ### Adding a feature, a dataset or a task
@@ -254,7 +256,8 @@ version 1 has an RMSE of 6.61 minutes and version 2 6.59; predicting the trainin
 Week 4 Task 4 builds the same model without the platform. `scripts/approach_a_from_raw.py` reads
 the raw files and the release v2 taxi file, and does the cleaning, the joins, the filters, the
 split, the feature stages and the regression itself, using no code from `src/urbanplatform` and
-no file from `conf/`. Every rule in it copies one the platform already applies.
+no file from `conf/`. Every rule in it copies one the platform already applies. It needs release
+v2 on disk, so run `scripts/generate_updates.py` first.
 
 ```bash
 python scripts/approach_a_from_raw.py             # raw files -> data/approach_a/, reports/comparison/approach_a.json
@@ -280,8 +283,8 @@ run.
 ## Project layout
 
 ```
-DesignReportWeek4.docx        the Week 4 design report
-EvaluationReportWeek4.docx    the Week 4 evaluation report
+DesignReportWeek4.pdf         the Week 4 design report (DesignReportWeek4.docx is its source)
+EvaluationReportWeek4.pdf     the Week 4 evaluation report (EvaluationReportWeek4.docx is its source)
 README.md                     this file
 conf/
   platform.yaml               Spark settings and the lakehouse root
@@ -304,7 +307,7 @@ src/urbanplatform/            the ingestion framework, the integration pipeline 
   analytics/                  the analytical queries, the data products and the benchmark harness
   ml/                         training datasets, feature generators, the feature pipeline and the model
 jobs/                         one entry point per step (see Scripts)
-scripts/                      the environment check, the update generator and the correctness checks
+scripts/                      the environment check, the update generator, the correctness checks and the Task 4 comparison
 docs/common_data_model.md     the common data model, with every column transformation listed
 reports/query_benchmark/      written by run_query_benchmark.py
 reports/updates/              written by generate_updates.py and verify_incremental.py
@@ -354,6 +357,6 @@ data/lakehouse/               created by the jobs
 | `scripts/verify_ml_model.py` | checks the saved models: lineage, reloading, a deterministic refit, no test data in the fit | yes |
 | `scripts/analyze_ml_features.py` | ablation and importance of each dataset's features | yes |
 | `scripts/approach_a_from_raw.py` | Week 4 Task 4: the same model built from the raw files without the platform | yes |
-| `scripts/compare_approaches.py` | checks that model and its dataset against the platform's, row by row | yes |
+| `scripts/compare_approaches.py` | checks Approach A's dataset and model against the platform's, row by row | yes |
 | `scripts/run_comparison.py` | times both approaches and runs the checks | yes |
 | `scripts/profile_raw.py` | profiles the raw files and produces every number quoted in the data catalog | no |
