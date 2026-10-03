@@ -283,8 +283,8 @@ run.
 ## Project layout
 
 ```
-DesignReportWeek4.pdf         the Week 4 design report (DesignReportWeek4.docx is its source)
-EvaluationReportWeek4.pdf     the Week 4 evaluation report (EvaluationReportWeek4.docx is its source)
+DesignReportWeek4.pdf         the Week 4 design report
+EvaluationReportWeek4.pdf     the Week 4 evaluation report
 README.md                     this file
 conf/
   platform.yaml               Spark settings and the lakehouse root
