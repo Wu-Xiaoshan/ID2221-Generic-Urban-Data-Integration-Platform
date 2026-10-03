@@ -2,6 +2,8 @@
 *.pdf
 !/DesignReportWeek4.pdf
 !/EvaluationReportWeek4.pdf
+/DesignReportWeek4.docx
+/EvaluationReportWeek4.docx
 /DesignReportWeek2.docx
 /BenchmarkReportWeek2.docx
 /DesignReportWeek3.docx
